@@ -152,6 +152,8 @@ func newStatusCmd() *cobra.Command {
 				return output.JSON(status)
 			}
 			appStatus := fmt.Sprintf("%v", status["status"])
+			deployPhase := fmt.Sprintf("%v", status["deployPhase"])
+			ciReady := fmt.Sprintf("%v", status["ciReady"]) == "true"
 			version := fmt.Sprintf("%v", status["version"])
 			if len(version) > 8 {
 				version = version[:8]
@@ -161,11 +163,32 @@ func newStatusCmd() *cobra.Command {
 				running = fmt.Sprintf("%v", sc["running"])
 				desired = fmt.Sprintf("%v", sc["desired"])
 			}
+
+			// Human-readable status annotation
+			statusDisplay := appStatus
+			switch deployPhase {
+			case "building":
+				statusDisplay = appStatus + "  (빌드 중...)"
+			case "syncing":
+				statusDisplay = appStatus + "  (배포 동기화 중...)"
+			}
+
 			rows := [][]string{
-				{"Status", appStatus},
+				{"Status", statusDisplay},
 				{"Instances", fmt.Sprintf("%s/%s running", running, desired)},
 				{"Version", version},
 			}
+
+			if !ciReady && appStatus == "not_deployed" {
+				rows = append(rows, []string{"CI Pipeline", "준비 중... (잠시 후 xquare deploy 가능)"})
+			}
+
+			if lb, ok := status["lastBuild"].(map[string]any); ok && lb != nil {
+				lbID := fmt.Sprintf("%v", lb["id"])
+				lbStatus := fmt.Sprintf("%v", lb["status"])
+				rows = append(rows, []string{"Last Build", fmt.Sprintf("%s  [%s]", lbStatus, lbID)})
+			}
+
 			if inst, ok := status["instances"].([]any); ok {
 				for i, instance := range inst {
 					if p, ok := instance.(map[string]any); ok {
@@ -211,7 +234,11 @@ func newCreateCmd() *cobra.Command {
 				return output.JSON(result)
 			}
 			output.Success(fmt.Sprintf("created app %s in project %s", appName, project))
-			output.Info(fmt.Sprintf("  push to %s/%s@%s to trigger first build", owner, repo, branch))
+			output.Info("")
+			output.Info("CI/CD 파이프라인 준비 중... (약 2~3분 소요)")
+			output.Info("준비 완료 후:")
+			output.Info(fmt.Sprintf("  xquare deploy %s --watch        # 첫 배포 시작 + 완료까지 대기", appName))
+			output.Info(fmt.Sprintf("  xquare env set %s KEY=value     # 환경변수 설정", appName))
 			return nil
 		},
 	}

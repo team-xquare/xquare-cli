@@ -40,50 +40,96 @@ func NewDeployCmd() *cobra.Command {
 			output.Success(fmt.Sprintf("build started: %s/%s  [%s]", project, appName, buildID))
 
 			if watch {
-				output.Info("watching deployment status (Ctrl+C to stop)...")
-				return watchDeploy(cmd, c, project, appName)
+				output.Info("building and deploying... (Ctrl+C to stop)")
+				return watchFull(cmd, c, project, appName, buildID)
 			}
-			output.Info(fmt.Sprintf("  run: xquare app status %s   to check progress", appName))
-			output.Info(fmt.Sprintf("  run: xquare logs %s          to stream logs", appName))
+			output.Info(fmt.Sprintf("  xquare logs %s --build          # 빌드 로그 실시간 확인", appName))
+			output.Info(fmt.Sprintf("  xquare deploy %s --watch        # 배포 완료까지 대기", appName))
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "watch deployment progress")
+	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "watch until deployment is fully running")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
 }
 
-func watchDeploy(cmd *cobra.Command, c *api.Client, project, app string) error {
+// watchFull tracks: Phase 1 build → Phase 2 ArgoCD sync → Phase 3 running
+func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	timeout := time.After(10 * time.Minute)
+	timeout := time.After(15 * time.Minute)
+
+	phase := "building"
+	lastMsg := ""
+
+	printOnce := func(msg string) {
+		if msg != lastMsg {
+			output.Info(msg)
+			lastMsg = msg
+		}
+	}
 
 	for {
 		select {
 		case <-cmd.Context().Done():
 			return nil
 		case <-timeout:
-			return fmt.Errorf("timeout waiting for deployment (10min)")
+			return fmt.Errorf("timeout (15min)\n\n  xquare logs %s --build   # 빌드 로그 확인", app)
 		case <-ticker.C:
-			status, err := c.GetAppStatus(cmd.Context(), project, app)
-			if err != nil {
-				output.Info(fmt.Sprintf("  status check failed: %v", err))
-				continue
-			}
-			s := fmt.Sprintf("%v", status["status"])
-			running, desired := "?", "?"
-			if sc, ok := status["scale"].(map[string]any); ok {
-				running = fmt.Sprintf("%v", sc["running"])
-				desired = fmt.Sprintf("%v", sc["desired"])
-			}
-			output.Info(fmt.Sprintf("  → %s  (%s/%s running)", s, running, desired))
-			if s == "running" {
-				output.Success("deployment complete")
-				return nil
-			}
-			if s == "failed" {
-				return fmt.Errorf("deployment failed — run: xquare logs %s", app)
+			switch phase {
+
+			case "building":
+				builds, err := c.ListBuilds(cmd.Context(), project, app)
+				if err != nil {
+					continue
+				}
+				var buildStatus string
+				for _, b := range builds {
+					if fmt.Sprintf("%v", b["id"]) == buildID {
+						buildStatus = fmt.Sprintf("%v", b["status"])
+						break
+					}
+				}
+				switch buildStatus {
+				case "success":
+					output.Success("[1/3] 빌드 완료")
+					output.Info("  [2/3] ArgoCD 배포 동기화 중...")
+					phase = "syncing"
+				case "failed":
+					return fmt.Errorf("빌드 실패\n\n  xquare logs %s --build --build-id %s", app, buildID)
+				default:
+					printOnce(fmt.Sprintf("  [1/3] 빌드 중...  [%s]", buildID))
+				}
+
+			case "syncing":
+				status, err := c.GetAppStatus(cmd.Context(), project, app)
+				if err != nil {
+					continue
+				}
+				if fmt.Sprintf("%v", status["status"]) != "not_deployed" {
+					phase = "deploying"
+				}
+
+			case "deploying":
+				status, err := c.GetAppStatus(cmd.Context(), project, app)
+				if err != nil {
+					continue
+				}
+				s := fmt.Sprintf("%v", status["status"])
+				running, desired := "?", "?"
+				if sc, ok := status["scale"].(map[string]any); ok {
+					running = fmt.Sprintf("%v", sc["running"])
+					desired = fmt.Sprintf("%v", sc["desired"])
+				}
+				printOnce(fmt.Sprintf("  [3/3] 배포 중...  (%s/%s 실행 중)", running, desired))
+				switch s {
+				case "running":
+					output.Success(fmt.Sprintf("배포 완료  (%s/%s running)", running, desired))
+					return nil
+				case "failed":
+					return fmt.Errorf("배포 실패 — Pod가 시작되지 않음\n\n  xquare logs %s", app)
+				}
 			}
 		}
 	}
