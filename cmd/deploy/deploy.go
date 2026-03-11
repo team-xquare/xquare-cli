@@ -27,15 +27,10 @@ func NewDeployCmd() *cobra.Command {
 			}
 			appName := args[0]
 
-			// Token priority: --github-token flag > XQUARE_GITHUB_TOKEN env > error
+			// Optional user token — if omitted, server uses GitHub App installation token
 			token := githubToken
 			if token == "" {
 				token = os.Getenv("XQUARE_GITHUB_TOKEN")
-			}
-			if token == "" {
-				return fmt.Errorf("GitHub token required\n\n" +
-					"  Set XQUARE_GITHUB_TOKEN env var, or pass --github-token <token>\n" +
-					"  Token needs repo scope to read commit SHAs")
 			}
 
 			if dryRun {
@@ -66,7 +61,7 @@ func NewDeployCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub personal access token (or set XQUARE_GITHUB_TOKEN)")
+	cmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub personal access token (optional; defaults to GitHub App)")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "watch deployment progress")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
