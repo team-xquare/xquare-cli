@@ -18,8 +18,21 @@ func IsTTY() bool {
 	return isatty.IsTerminal(os.Stdout.Fd())
 }
 
-// JSON prints v as JSON to stdout
+// globalJQ and globalFields are set from CLI flags before rendering
+var globalJQ string
+var globalFields []string
+
+// SetGlobalFilters sets jq expression and fields for the current invocation
+func SetGlobalFilters(jq string, fields []string) {
+	globalJQ = jq
+	globalFields = fields
+}
+
+// JSON prints v as JSON to stdout, applying global --jq and --fields filters
 func JSON(v any) error {
+	if globalJQ != "" || len(globalFields) > 0 {
+		return JSONWithFilter(v, globalJQ, globalFields)
+	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)

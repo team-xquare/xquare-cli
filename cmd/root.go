@@ -22,6 +22,11 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "xquare",
 	Short: "xquare PaaS CLI — manage your projects, apps, and services",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		jq, _ := cmd.Root().PersistentFlags().GetString("jq")
+		fields, _ := cmd.Root().PersistentFlags().GetStringSlice("fields")
+		output.SetGlobalFilters(jq, fields)
+	},
 }
 
 func init() {
