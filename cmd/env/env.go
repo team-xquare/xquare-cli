@@ -234,7 +234,7 @@ func newEnvPushCmd() *cobra.Command {
 
 			f, err := os.Open(inputFile)
 			if err != nil {
-				return fmt.Errorf("open %s: %w", inputFile, err)
+				return err
 			}
 			defer f.Close()
 

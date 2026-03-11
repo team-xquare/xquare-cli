@@ -2,12 +2,15 @@ package addon
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/spf13/cobra"
 
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
+
+var storageRe = regexp.MustCompile(`^\d+(Ki|Mi|Gi|Ti|Pi|E|P|T|G|M|K)$`)
 
 func NewAddonCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -74,12 +77,23 @@ func newAddonCreateCmd() *cobra.Command {
 		Short: "Create an addon (mysql, postgresql, redis, mongodb, etc.)",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			addonType := args[1]
+			validTypes := map[string]bool{
+				"mysql": true, "postgresql": true, "redis": true, "mongodb": true,
+				"kafka": true, "rabbitmq": true, "opensearch": true, "elasticsearch": true, "qdrant": true,
+			}
+			if !validTypes[addonType] {
+				return fmt.Errorf("unsupported addon type %q\n\nSupported types: mysql, postgresql, redis, mongodb, kafka, rabbitmq, opensearch, elasticsearch, qdrant", addonType)
+			}
+			if !storageRe.MatchString(storage) {
+				return fmt.Errorf("invalid storage %q: must be a number followed by a unit (e.g. 1Gi, 500Mi, 10Gi)", storage)
+			}
 			project, err := api.RequireProject(cmd)
 			if err != nil {
 				return err
 			}
 			if dryRun {
-				output.Info(fmt.Sprintf("[dry-run] would create %s addon '%s' in project %s", args[1], args[0], project))
+				output.Info(fmt.Sprintf("[dry-run] would create %s addon '%s' in project %s", addonType, args[0], project))
 				return nil
 			}
 			c := api.FromCmd(cmd)
@@ -152,25 +166,37 @@ func newAddonConnectionCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			conn, err := c.GetAddonConnection(cmd.Context(), project, args[0])
+			addonName := args[0]
+			conn, err := c.GetAddonConnection(cmd.Context(), project, addonName)
 			if err != nil {
 				return err
 			}
 			if api.IsJSON(cmd) {
 				return output.JSON(conn)
 			}
+			ready := fmt.Sprintf("%v", conn["ready"]) == "true"
 			readyStr := "⏳ 프로비저닝 중 (아직 접속 불가)"
-			if fmt.Sprintf("%v", conn["ready"]) == "true" {
+			if ready {
 				readyStr = "✓ 사용 가능"
 			}
+			addonType := fmt.Sprintf("%v", conn["type"])
 			rows := [][]string{
 				{"Status", readyStr},
-				{"Type", fmt.Sprintf("%v", conn["type"])},
+				{"Type", addonType},
 				{"Host", fmt.Sprintf("%v", conn["host"])},
 				{"Port", fmt.Sprintf("%v", conn["port"])},
 				{"Password", fmt.Sprintf("%v", conn["password"])},
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
+			if ready {
+				output.Info("")
+				output.Info("터널 연결:")
+				output.Info(fmt.Sprintf("  xquare db connect %s   # 인터랙티브 클라이언트 실행", addonName))
+				output.Info(fmt.Sprintf("  xquare db tunnel %s    # 로컬 포트 포워딩만 열기", addonName))
+			} else {
+				output.Info("")
+				output.Info(fmt.Sprintf("  xquare addon list   # 준비 상태 확인"))
+			}
 			return nil
 		},
 	}

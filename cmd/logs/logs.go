@@ -63,7 +63,7 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 		if e.Code == "not_deployed" {
 			return fmt.Errorf("%s\n\n  xquare deploy %s --watch   # 배포 시작", e.Error, appName)
 		}
-		return fmt.Errorf("app not found")
+		return fmt.Errorf("app %q not found in project %q\n\n  xquare app list   # list apps in this project", appName, project)
 	}
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("server error: %d", resp.StatusCode)
@@ -71,6 +71,7 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 
 	isJSON := api.IsJSON(cmd)
 	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 512*1024), 512*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if isJSON {
@@ -101,8 +102,9 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 		output.Info(fmt.Sprintf("build: %s  [%s]", buildID, buildStatus))
 	}
 
-	// Auto-reconnect loop for running builds
-	maxRetries := 10
+	// Auto-reconnect loop for running/pending builds
+	maxRetries := 30
+	printed := false // tracks whether we've printed any log lines
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		select {
 		case <-cmd.Context().Done():
@@ -118,13 +120,21 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 					if fmt.Sprintf("%v", b["id"]) == buildID {
 						s := fmt.Sprintf("%v", b["status"])
 						if s != "running" && s != "pending" {
-							// Build finished, no need to reconnect
+							// Build finished — do one final fetch to get remaining logs
+							if !printed {
+								// First time seeing logs after build finished
+								break
+							}
 							return nil
 						}
 					}
 				}
 			}
-			output.Info("  연결이 끊어졌습니다. 재연결 중...")
+			if printed {
+				output.Info("  연결이 끊어졌습니다. 재연결 중...")
+			} else {
+				output.Info("  빌드 로그 대기 중...")
+			}
 			time.Sleep(2 * time.Second)
 		}
 
@@ -145,9 +155,12 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 		}
 
 		isJSON := api.IsJSON(cmd)
+		// Use a larger scanner buffer for long Docker build lines
 		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 512*1024), 512*1024)
 		for scanner.Scan() {
 			line := scanner.Text()
+			printed = true
 			if isJSON {
 				_ = output.NDJSONLine(map[string]string{"line": line})
 			} else {
