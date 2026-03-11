@@ -2,7 +2,6 @@ package deploy
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -12,7 +11,6 @@ import (
 )
 
 func NewDeployCmd() *cobra.Command {
-	var githubToken string
 	var watch bool
 	var dryRun bool
 
@@ -27,19 +25,13 @@ func NewDeployCmd() *cobra.Command {
 			}
 			appName := args[0]
 
-			// Optional user token — if omitted, server uses GitHub App installation token
-			token := githubToken
-			if token == "" {
-				token = os.Getenv("XQUARE_GITHUB_TOKEN")
-			}
-
 			if dryRun {
 				output.Info(fmt.Sprintf("[dry-run] would redeploy %s/%s", project, appName))
 				return nil
 			}
 
 			c := api.FromCmd(cmd)
-			result, err := c.RedeployApp(cmd.Context(), project, appName, token)
+			result, err := c.RedeployApp(cmd.Context(), project, appName, "")
 			if err != nil {
 				return err
 			}
@@ -61,7 +53,6 @@ func NewDeployCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub personal access token (optional; defaults to GitHub App)")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "watch deployment progress")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
