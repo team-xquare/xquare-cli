@@ -111,10 +111,14 @@ func decode(resp *http.Response, out any) error {
 
 func parseError(resp *http.Response) error {
 	var e struct {
-		Error string `json:"error"`
+		Error      string `json:"error"`
+		InstallURL string `json:"install_url"`
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&e)
 	if e.Error != "" {
+		if e.InstallURL != "" {
+			return fmt.Errorf("%s\n\nInstall the GitHub App at: %s", e.Error, e.InstallURL)
+		}
 		return fmt.Errorf("server error %d: %s", resp.StatusCode, e.Error)
 	}
 	return fmt.Errorf("server error %d", resp.StatusCode)
