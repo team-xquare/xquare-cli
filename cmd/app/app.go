@@ -266,10 +266,22 @@ func newUpdateCmd() *cobra.Command {
 						gh[k] = v
 					}
 				}
-				if cmd.Flags().Changed("owner") { owner, _ := cmd.Flags().GetString("owner"); gh["owner"] = owner }
-				if cmd.Flags().Changed("repo") { repo, _ := cmd.Flags().GetString("repo"); gh["repo"] = repo }
-				if cmd.Flags().Changed("branch") { branch, _ := cmd.Flags().GetString("branch"); gh["branch"] = branch }
-				if cmd.Flags().Changed("installation-id") { installID, _ := cmd.Flags().GetString("installation-id"); gh["installationId"] = installID }
+				if cmd.Flags().Changed("owner") {
+					owner, _ := cmd.Flags().GetString("owner")
+					gh["owner"] = owner
+				}
+				if cmd.Flags().Changed("repo") {
+					repo, _ := cmd.Flags().GetString("repo")
+					gh["repo"] = repo
+				}
+				if cmd.Flags().Changed("branch") {
+					branch, _ := cmd.Flags().GetString("branch")
+					gh["branch"] = branch
+				}
+				if cmd.Flags().Changed("installation-id") {
+					installID, _ := cmd.Flags().GetString("installation-id")
+					gh["installationId"] = installID
+				}
 				body["github"] = gh
 			}
 			if cmd.Flags().Changed("build-type") {

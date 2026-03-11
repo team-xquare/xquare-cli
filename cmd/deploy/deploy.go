@@ -31,7 +31,7 @@ func NewDeployCmd() *cobra.Command {
 			}
 
 			c := api.FromCmd(cmd)
-			result, err := c.RedeployApp(cmd.Context(), project, appName, "")
+			result, err := c.RedeployApp(cmd.Context(), project, appName)
 			if err != nil {
 				return err
 			}
