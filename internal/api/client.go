@@ -251,16 +251,40 @@ func (c *Client) GetAddonConnection(ctx context.Context, project, addon string) 
 }
 
 // Logs — returns the raw response for streaming
-func (c *Client) StreamLogs(ctx context.Context, project, app string, tail int64, follow bool) (*http.Response, error) {
+func (c *Client) StreamLogs(ctx context.Context, project, app string, tail int64, follow bool, since string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/projects/%s/apps/%s/logs?tail=%d", c.base, project, app, tail)
 	if !follow {
 		url += "&follow=false"
+	}
+	if since != "" {
+		url += "&since=" + since
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
-	// Use a client without timeout for streaming
+	return (&http.Client{}).Do(req)
+}
+
+// Builds
+
+func (c *Client) ListBuilds(ctx context.Context, project, app string) ([]map[string]any, error) {
+	var out struct {
+		Builds []map[string]any `json:"builds"`
+	}
+	return out.Builds, c.get(ctx, "/projects/"+project+"/apps/"+app+"/builds", &out)
+}
+
+func (c *Client) StreamBuildLogs(ctx context.Context, project, app, workflow string, follow bool) (*http.Response, error) {
+	url := fmt.Sprintf("%s/projects/%s/apps/%s/builds/%s/logs", c.base, project, app, workflow)
+	if !follow {
+		url += "?follow=false"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
 	return (&http.Client{}).Do(req)
 }

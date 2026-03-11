@@ -26,6 +26,8 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().Bool("json", false, "output as JSON")
+	rootCmd.PersistentFlags().String("jq", "", "filter JSON output with a jq expression")
+	rootCmd.PersistentFlags().StringSlice("fields", nil, "select fields from JSON response (e.g. name,status)")
 	rootCmd.PersistentFlags().StringP("project", "p", "", "project name (overrides .xquare/config)")
 
 	rootCmd.AddCommand(

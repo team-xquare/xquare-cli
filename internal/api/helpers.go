@@ -52,3 +52,10 @@ func RequireProject(cmd *cobra.Command) (string, error) {
 	}
 	return "", fmt.Errorf("project not specified (use --project or run 'xquare link <project>')")
 }
+
+// JSONOut outputs v as JSON, applying --jq and --fields filters if set.
+func JSONOut(cmd *cobra.Command, v any) error {
+	jqExpr, _ := cmd.Root().PersistentFlags().GetString("jq")
+	fields, _ := cmd.Root().PersistentFlags().GetStringSlice("fields")
+	return output.JSONWithFilter(v, jqExpr, fields)
+}
