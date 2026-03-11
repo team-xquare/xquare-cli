@@ -145,9 +145,9 @@ func newMembersCmd() *cobra.Command {
 			}
 			rows := make([][]string, len(members))
 			for i, m := range members {
-				rows[i] = []string{m}
+				rows[i] = []string{m.Username, fmt.Sprintf("%d", m.ID)}
 			}
-			output.Table([]string{"USERNAME"}, rows)
+			output.Table([]string{"USERNAME", "GITHUB ID"}, rows)
 			return nil
 		},
 	}
