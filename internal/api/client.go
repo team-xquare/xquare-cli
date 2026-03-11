@@ -156,6 +156,21 @@ func (c *Client) DeleteProject(ctx context.Context, project string) error {
 	return c.delete(ctx, "/projects/"+project)
 }
 
+func (c *Client) ListMembers(ctx context.Context, project string) ([]string, error) {
+	var out struct {
+		Owners []string `json:"owners"`
+	}
+	return out.Owners, c.get(ctx, "/projects/"+project+"/members", &out)
+}
+
+func (c *Client) AddMember(ctx context.Context, project, username string) error {
+	return c.post(ctx, "/projects/"+project+"/members", map[string]string{"username": username}, nil)
+}
+
+func (c *Client) RemoveMember(ctx context.Context, project, username string) error {
+	return c.delete(ctx, "/projects/"+project+"/members/"+username)
+}
+
 // Apps
 
 func (c *Client) ListApps(ctx context.Context, project string) ([]map[string]any, error) {
