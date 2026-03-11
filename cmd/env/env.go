@@ -128,23 +128,29 @@ func newEnvSetCmd() *cobra.Command {
 func newEnvDeleteCmd() *cobra.Command {
 	var dryRun bool
 	cmd := &cobra.Command{
-		Use:   "delete <app> <KEY>",
-		Short: "Delete an environment variable",
-		Args:  cobra.ExactArgs(2),
+		Use:   "delete <app> <KEY> [KEY...]",
+		Short: "Delete one or more environment variables",
+		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			project, err := api.RequireProject(cmd)
 			if err != nil {
 				return err
 			}
+			appName := args[0]
+			keys := args[1:]
 			if dryRun {
-				output.Info(fmt.Sprintf("[dry-run] would delete env var %s from %s/%s", args[1], project, args[0]))
+				for _, k := range keys {
+					output.Info(fmt.Sprintf("[dry-run] would delete env var %s from %s/%s", k, project, appName))
+				}
 				return nil
 			}
 			c := api.FromCmd(cmd)
-			if err := c.DeleteEnvKey(cmd.Context(), project, args[0], args[1]); err != nil {
-				return err
+			for _, k := range keys {
+				if err := c.DeleteEnvKey(cmd.Context(), project, appName, k); err != nil {
+					return err
+				}
 			}
-			output.Success(fmt.Sprintf("deleted env var %s", args[1]))
+			output.Success(fmt.Sprintf("deleted %d env var(s)", len(keys)))
 			return nil
 		},
 	}
