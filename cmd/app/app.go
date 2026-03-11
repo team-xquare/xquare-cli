@@ -128,7 +128,33 @@ func newGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return output.JSON(a)
+			if api.IsJSON(cmd) {
+				return output.JSON(a)
+			}
+			rows := [][]string{{"Name", args[0]}}
+			if gh, ok := a["github"].(map[string]any); ok {
+				rows = append(rows, []string{"GitHub", fmt.Sprintf("%v/%v@%v", gh["owner"], gh["repo"], gh["branch"])})
+			}
+			// Build type
+			if build, ok := a["build"].(map[string]any); ok {
+				for buildType := range build {
+					rows = append(rows, []string{"Build Type", buildType})
+					break
+				}
+			}
+			// Endpoints
+			if eps, ok := a["endpoints"].([]any); ok && len(eps) > 0 {
+				if ep, ok := eps[0].(map[string]any); ok {
+					rows = append(rows, []string{"Port", fmt.Sprintf("%v", ep["port"])})
+					if routes, ok := ep["routes"].([]any); ok && len(routes) > 0 {
+						for _, r := range routes {
+							rows = append(rows, []string{"Route", fmt.Sprintf("%v", r)})
+						}
+					}
+				}
+			}
+			output.Table([]string{"FIELD", "VALUE"}, rows)
+			return nil
 		},
 	}
 }

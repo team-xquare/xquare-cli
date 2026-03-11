@@ -21,8 +21,6 @@ func NewProjectCmd() *cobra.Command {
 		newCreateCmd(),
 		newDeleteCmd(),
 		newMembersCmd(),
-		newAddMemberCmd(),
-		newRemoveMemberCmd(),
 	)
 	return cmd
 }
@@ -66,7 +64,35 @@ func newGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return output.JSON(p)
+			if api.IsJSON(cmd) {
+				return output.JSON(p)
+			}
+			rows := [][]string{{"Name", args[0]}}
+			if apps, ok := p["applications"].([]any); ok {
+				rows = append(rows, []string{"Apps", fmt.Sprintf("%d", len(apps))})
+				for _, a := range apps {
+					if app, ok := a.(map[string]any); ok {
+						rows = append(rows, []string{"  app", fmt.Sprintf("%v", app["name"])})
+					}
+				}
+			}
+			if addons, ok := p["addons"].([]any); ok && len(addons) > 0 {
+				rows = append(rows, []string{"Addons", fmt.Sprintf("%d", len(addons))})
+				for _, a := range addons {
+					if addon, ok := a.(map[string]any); ok {
+						rows = append(rows, []string{"  addon", fmt.Sprintf("%v (%v)", addon["name"], addon["type"])})
+					}
+				}
+			}
+			if owners, ok := p["owners"].([]any); ok {
+				for _, o := range owners {
+					if owner, ok := o.(map[string]any); ok {
+						rows = append(rows, []string{"Member", fmt.Sprintf("%v", owner["username"])})
+					}
+				}
+			}
+			output.Table([]string{"FIELD", "VALUE"}, rows)
+			return nil
 		},
 	}
 }
@@ -123,10 +149,11 @@ func newDeleteCmd() *cobra.Command {
 }
 
 func newMembersCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "members",
-		Short: "List project members",
+		Short: "Manage project members",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Default action: list members
 			c := api.FromCmd(cmd)
 			project, err := api.RequireProject(cmd)
 			if err != nil {
@@ -151,11 +178,13 @@ func newMembersCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.AddCommand(newMembersAddCmd(), newMembersRemoveCmd())
+	return cmd
 }
 
-func newAddMemberCmd() *cobra.Command {
+func newMembersAddCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "add-member <github-username>",
+		Use:   "add <github-username>",
 		Short: "Add a member to the project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -173,10 +202,10 @@ func newAddMemberCmd() *cobra.Command {
 	}
 }
 
-func newRemoveMemberCmd() *cobra.Command {
+func newMembersRemoveCmd() *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "remove-member <github-username>",
+		Use:   "remove <github-username>",
 		Short: "Remove a member from the project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
