@@ -275,23 +275,28 @@ func newCreateCmd() *cobra.Command {
 
 			// Auto-detect owner/repo from git remote if not specified
 			ownerChanged := cmd.Flags().Changed("owner")
+			autoDetected := false
 			if repo == "" || !ownerChanged {
 				detectedOwner, detectedRepo := detectGitOrigin()
 				if repo == "" {
 					if detectedRepo != "" {
 						repo = detectedRepo
+						autoDetected = true
 					} else {
 						return fmt.Errorf("--repo is required (e.g. --repo my-repo-name)\n\n  xquare app create %s --repo <github-repo-name>", appName)
 					}
 				}
 				if !ownerChanged && detectedOwner != "" {
 					owner = detectedOwner
+					autoDetected = true
 				}
 			}
 			if owner == "" {
 				return fmt.Errorf("--owner is required (e.g. --owner my-github-org)\n\n  xquare app create %s --owner <github-org>", appName)
 			}
-			output.Info(fmt.Sprintf("repo: %s/%s", owner, repo))
+			if autoDetected {
+				output.Info(fmt.Sprintf("detected: %s/%s", owner, repo))
+			}
 
 			body := buildAppBody(appName, buildType, owner, repo, branch, port, routes, cmd)
 			if dryRun {
