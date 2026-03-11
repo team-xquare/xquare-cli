@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -246,6 +248,27 @@ func newCreateCmd() *cobra.Command {
 			branch, _ := cmd.Flags().GetString("branch")
 			port, _ := cmd.Flags().GetInt("port")
 			routes, _ := cmd.Flags().GetStringSlice("routes")
+
+			// Validate build-type
+			validBuildTypes := map[string]bool{
+				"gradle": true, "nodejs": true, "react": true, "vite": true,
+				"go": true, "rust": true, "maven": true, "django": true,
+				"flask": true, "docker": true,
+			}
+			if !validBuildTypes[buildType] {
+				return fmt.Errorf("invalid --build-type %q\n\nSupported types: gradle, nodejs, react, vite, go, rust, maven, django, flask, docker", buildType)
+			}
+
+			// Auto-detect repo from git remote if not specified
+			if repo == "" {
+				if detected := detectGitRepo(); detected != "" {
+					repo = detected
+					output.Info(fmt.Sprintf("detected repo: %s/%s", owner, repo))
+				} else {
+					return fmt.Errorf("--repo is required (e.g. --repo my-repo-name)\n\n  xquare app create %s --repo <github-repo-name>", appName)
+				}
+			}
+
 			body := buildAppBody(appName, buildType, owner, repo, branch, port, routes, cmd)
 			if dryRun {
 				output.Info(fmt.Sprintf("[dry-run] would create app %s in project %s", appName, project))
@@ -490,6 +513,29 @@ func buildBody(buildType string, cmd *cobra.Command) map[string]any {
 		ctx, _ := cmd.Flags().GetString("context")
 		return map[string]any{"docker": map[string]any{"dockerfilePath": df, "contextPath": ctx}}
 	}
+}
+
+// detectGitRepo extracts the repository name from git remote origin URL.
+// Returns empty string if not in a git repo or no remote.
+func detectGitRepo() string {
+	out, err := exec.Command("git", "remote", "get-url", "origin").Output()
+	if err != nil {
+		return ""
+	}
+	url := strings.TrimSpace(string(out))
+	// Strip credentials from HTTPS URLs (https://token@github.com/owner/repo.git)
+	if idx := strings.LastIndex(url, "@"); idx != -1 {
+		url = "https://" + url[idx+1:]
+	}
+	// Extract repo name from various URL formats:
+	// https://github.com/owner/repo.git  → repo
+	// git@github.com:owner/repo.git      → repo
+	url = strings.TrimSuffix(url, ".git")
+	parts := strings.Split(url, "/")
+	if len(parts) >= 2 {
+		return parts[len(parts)-1]
+	}
+	return ""
 }
 
 func buildAppBody(name, buildType, owner, repo, branch string, port int, routes []string, cmd *cobra.Command) map[string]any {

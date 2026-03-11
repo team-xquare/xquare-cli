@@ -53,6 +53,20 @@ func RequireProject(cmd *cobra.Command) (string, error) {
 	return "", fmt.Errorf("project not specified (use --project or run 'xquare link <project>')")
 }
 
+// GetCurrentProject returns the currently linked project without requiring it.
+// Returns empty string if not linked.
+func GetCurrentProject(cmd *cobra.Command) (string, error) {
+	p, _ := cmd.Root().PersistentFlags().GetString("project")
+	if p != "" {
+		return p, nil
+	}
+	pc, _ := config.LoadProject()
+	if pc != nil {
+		return pc.Project, nil
+	}
+	return "", nil
+}
+
 // JSONOut outputs v as JSON, applying --jq and --fields filters if set.
 func JSONOut(cmd *cobra.Command, v any) error {
 	jqExpr, _ := cmd.Root().PersistentFlags().GetString("jq")
