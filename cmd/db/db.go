@@ -1,10 +1,9 @@
 package db
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"net"
+	"os"
 	"os/exec"
 	"os/signal"
 	"strconv"
@@ -60,47 +59,43 @@ func newDBConnectCmd() *cobra.Command {
 				localPort = tunnelPort
 			}
 
-			output.Info(fmt.Sprintf("starting tunnel: localhost:%d → %s:%s:%d", localPort, tunnelHost, addonName, tunnelPort))
-
-			// Start tunnel in background goroutine
-			tun := &tunnel.Tunnel{
-				TunnelHost:    tunnelHost,
-				Password:      password,
-				TargetService: addonName,
-				TargetPort:    tunnelPort,
-				LocalPort:     localPort,
+			wstunnelBin, tmpPath, err := resolveBinary()
+			if tmpPath != "" {
+				defer os.Remove(tmpPath)
+			}
+			if err != nil {
+				return err
 			}
 
-			ctx, cancel := context.WithCancel(cmd.Context())
-			defer cancel()
+			output.Info(fmt.Sprintf("starting tunnel: localhost:%d → %s:%s:%d", localPort, tunnelHost, addonName, tunnelPort))
 
-			errCh := make(chan error, 1)
-			go func() {
-				errCh <- tun.Start(ctx)
-			}()
+			tunnelProc, err := startTunnelProc(wstunnelBin, tunnelHost, password, addonName, tunnelPort, localPort)
+			if err != nil {
+				return fmt.Errorf("start tunnel: %w", err)
+			}
+			defer tunnelProc.Kill()
 
-			// Wait briefly for listener to be ready
-			<-waitReady(localPort)
+			// Wait for port to be ready
+			if err := waitPortReady(localPort, 3*time.Second); err != nil {
+				return fmt.Errorf("tunnel did not start in time: %w", err)
+			}
 
 			output.Info(fmt.Sprintf("tunnel ready — connecting to %s...", addonType))
-
-			err = runNativeClient(addonType, "127.0.0.1", strconv.Itoa(localPort), password, addonName)
-			cancel()
-			return err
+			return runNativeClient(addonType, "127.0.0.1", strconv.Itoa(localPort), password, addonName)
 		},
 	}
 	cmd.Flags().IntVar(&localPort, "local-port", 0, "local port (defaults to service port)")
 	return cmd
 }
 
-// xquare db tunnel <addon> — starts pure-Go WebSocket tunnel
+// xquare db tunnel <addon> — starts wstunnel port forwarding
 func newDBTunnelCmd() *cobra.Command {
 	var localPort int
 	var printURL bool
 
 	cmd := &cobra.Command{
 		Use:   "tunnel <addon>",
-		Short: "Open a local port tunnel to the database (no external tools needed)",
+		Short: "Open a local port tunnel to the database",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := api.FromCmd(cmd)
@@ -131,31 +126,42 @@ func newDBTunnelCmd() *cobra.Command {
 				return nil
 			}
 
+			wstunnelBin, tmpPath, err := resolveBinary()
+			if tmpPath != "" {
+				defer os.Remove(tmpPath)
+			}
+			if err != nil {
+				return err
+			}
+
 			output.Info(fmt.Sprintf("tunneling localhost:%d → %s:%s:%d", localPort, tunnelHost, addonName, tunnelPort))
 			output.Info(fmt.Sprintf("connection: %s", connStr))
 			output.Info("press Ctrl+C to stop")
 
-			tun := &tunnel.Tunnel{
-				TunnelHost:    tunnelHost,
-				Password:      password,
-				TargetService: addonName,
-				TargetPort:    tunnelPort,
-				LocalPort:     localPort,
-			}
-
-			ctx, cancel := context.WithCancel(cmd.Context())
-			defer cancel()
-
 			// Handle Ctrl+C
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+			localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, addonName, tunnelPort)
+			proc := exec.Command(wstunnelBin, "client",
+				"-L", localArg,
+				"--http-upgrade-path-prefix", password,
+				"--log-lvl", "OFF",
+				fmt.Sprintf("wss://%s", tunnelHost),
+			)
+			proc.Stdout = os.Stdout
+			proc.Stderr = os.Stderr
+			if err := proc.Start(); err != nil {
+				return fmt.Errorf("start wstunnel: %w", err)
+			}
+
 			go func() {
 				<-sigCh
 				output.Info("\ntunnel closed")
-				cancel()
+				proc.Process.Kill()
 			}()
 
-			return tun.Start(ctx)
+			return proc.Wait()
 		},
 	}
 	cmd.Flags().IntVar(&localPort, "local-port", 0, "local port (defaults to service port)")
@@ -163,22 +169,47 @@ func newDBTunnelCmd() *cobra.Command {
 	return cmd
 }
 
-// waitReady polls until the local port is listening (up to 2s)
-func waitReady(port int) <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		for i := 0; i < 20; i++ {
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 100*time.Millisecond)
-			if err == nil {
-				conn.Close()
-				close(ch)
-				return
-			}
-			time.Sleep(100 * time.Millisecond)
+// resolveBinary returns the wstunnel binary path.
+// If it extracts a temp binary, tmpPath is non-empty and must be removed by caller.
+func resolveBinary() (binPath, tmpPath string, err error) {
+	// Try embedded binary first
+	tmp, extractErr := tunnel.ExtractWstunnel()
+	if extractErr == nil {
+		return tmp, tmp, nil
+	}
+	// Fallback to system-installed wstunnel
+	sys, sysErr := exec.LookPath("wstunnel")
+	if sysErr == nil {
+		return sys, "", nil
+	}
+	return "", "", fmt.Errorf("wstunnel not available: %v", extractErr)
+}
+
+func startTunnelProc(bin, tunnelHost, password, serviceName string, servicePort, localPort int) (*os.Process, error) {
+	localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, serviceName, servicePort)
+	cmd := exec.Command(bin, "client",
+		"-L", localArg,
+		"--http-upgrade-path-prefix", password,
+		"--log-lvl", "OFF",
+		fmt.Sprintf("wss://%s", tunnelHost),
+	)
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	return cmd.Process, nil
+}
+
+func waitPortReady(port int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 200*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			return nil
 		}
-		close(ch)
-	}()
-	return ch
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("port %d not ready after %s", port, timeout)
 }
 
 func runNativeClient(addonType, host, port, password, dbName string) error {
@@ -199,11 +230,11 @@ func runNativeClient(addonType, host, port, password, dbName string) error {
 		bin = "mongosh"
 		args = []string{fmt.Sprintf("mongodb://root:%s@%s:%s/%s", password, host, port, dbName)}
 	default:
-		return fmt.Errorf("no native client support for %s\nUse 'xquare db tunnel --print-url' for the connection string", addonType)
+		return fmt.Errorf("no native client support for %s\nUse 'xquare db tunnel --print-url'", addonType)
 	}
 
 	if _, err := exec.LookPath(bin); err != nil {
-		return fmt.Errorf("%s not found in PATH\nConnection string: %s",
+		return fmt.Errorf("%s not found in PATH\nConnection: %s",
 			bin, connectionString(addonType, host, port, password, dbName))
 	}
 
