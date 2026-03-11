@@ -175,7 +175,8 @@ func newAddonConnectionCmd() *cobra.Command {
 				return output.JSON(conn)
 			}
 			ready := fmt.Sprintf("%v", conn["ready"]) == "true"
-			readyStr := "⏳ 프로비저닝 중 (아직 접속 불가)"
+			host := fmt.Sprintf("%v", conn["host"])
+			readyStr := "⏳ 프로비저닝 중"
 			if ready {
 				readyStr = "✓ 사용 가능"
 			}
@@ -183,19 +184,20 @@ func newAddonConnectionCmd() *cobra.Command {
 			rows := [][]string{
 				{"Status", readyStr},
 				{"Type", addonType},
-				{"Host", fmt.Sprintf("%v", conn["host"])},
+				{"Host", host},
 				{"Port", fmt.Sprintf("%v", conn["port"])},
 				{"Password", fmt.Sprintf("%v", conn["password"])},
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
-			if ready {
+			// Show connection hints if host is available (even if ready=false due to server bug)
+			if host != "" && host != "<nil>" {
 				output.Info("")
 				output.Info("터널 연결:")
 				output.Info(fmt.Sprintf("  xquare db connect %s   # 인터랙티브 클라이언트 실행", addonName))
 				output.Info(fmt.Sprintf("  xquare db tunnel %s    # 로컬 포트 포워딩만 열기", addonName))
 			} else {
 				output.Info("")
-				output.Info(fmt.Sprintf("  xquare addon list   # 준비 상태 확인"))
+				output.Info("  xquare addon list   # 준비 상태 확인")
 			}
 			return nil
 		},
