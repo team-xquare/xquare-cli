@@ -96,20 +96,20 @@ func newListCmd() *cobra.Command {
 						hash = h
 					}
 				}
-				statusStr, replicas := "Unknown", "-"
+				statusStr, instances := "unknown", "-"
 				if r.err == nil && r.status != nil {
 					statusStr = fmt.Sprintf("%v", r.status["status"])
-					if rep, ok := r.status["replicas"].(map[string]any); ok {
-						replicas = fmt.Sprintf("%v/%v", rep["ready"], rep["desired"])
+					if sc, ok := r.status["scale"].(map[string]any); ok {
+						instances = fmt.Sprintf("%v/%v", sc["running"], sc["desired"])
 					}
 				}
-				rows = append(rows, []string{r.name, statusStr, replicas, hash})
+				rows = append(rows, []string{r.name, statusStr, instances, hash})
 			}
-			output.Table([]string{"NAME", "STATUS", "REPLICAS", "HASH"}, rows)
+			output.Table([]string{"NAME", "STATUS", "INSTANCES", "VERSION"}, rows)
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&withStatus, "status", "s", false, "include deployment status (parallel K8s queries)")
+	cmd.Flags().BoolVarP(&withStatus, "status", "s", false, "include live status for each app")
 	return cmd
 }
 
@@ -152,24 +152,24 @@ func newStatusCmd() *cobra.Command {
 				return output.JSON(status)
 			}
 			appStatus := fmt.Sprintf("%v", status["status"])
-			hash := fmt.Sprintf("%v", status["hash"])
-			if len(hash) > 8 {
-				hash = hash[:8]
+			version := fmt.Sprintf("%v", status["version"])
+			if len(version) > 8 {
+				version = version[:8]
 			}
-			ready, desired := "?", "?"
-			if rep, ok := status["replicas"].(map[string]any); ok {
-				ready = fmt.Sprintf("%v", rep["ready"])
-				desired = fmt.Sprintf("%v", rep["desired"])
+			running, desired := "?", "?"
+			if sc, ok := status["scale"].(map[string]any); ok {
+				running = fmt.Sprintf("%v", sc["running"])
+				desired = fmt.Sprintf("%v", sc["desired"])
 			}
 			rows := [][]string{
 				{"Status", appStatus},
-				{"Replicas", fmt.Sprintf("%s/%s", ready, desired)},
-				{"Hash", hash},
+				{"Instances", fmt.Sprintf("%s/%s running", running, desired)},
+				{"Version", version},
 			}
-			if pods, ok := status["pods"].([]any); ok {
-				for _, pod := range pods {
-					if p, ok := pod.(map[string]any); ok {
-						rows = append(rows, []string{"Pod", fmt.Sprintf("%v  phase=%v  restarts=%v", p["name"], p["phase"], p["restartCount"])})
+			if inst, ok := status["instances"].([]any); ok {
+				for i, instance := range inst {
+					if p, ok := instance.(map[string]any); ok {
+						rows = append(rows, []string{fmt.Sprintf("Instance %d", i+1), fmt.Sprintf("status=%v  restarts=%v", p["status"], p["restarts"])})
 					}
 				}
 			}
