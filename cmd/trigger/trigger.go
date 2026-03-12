@@ -130,7 +130,7 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 					return nil
 				case "failed":
 					failCount++
-					if failCount >= 3 {
+					if failCount >= 6 {
 						return fmt.Errorf("배포 실패 — Pod가 시작되지 않음\n\n  xquare logs %s", app)
 					}
 					continue

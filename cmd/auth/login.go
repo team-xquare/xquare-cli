@@ -65,7 +65,7 @@ func receiveOAuthCode() (string, error) {
 	clientID := getClientID(cfg.ServerURL)
 
 	authURL := fmt.Sprintf(
-		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=repo",
+		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=read:user",
 		clientID, "http://localhost:9999/callback",
 	)
 
@@ -105,5 +105,5 @@ func getClientID(serverURL string) string {
 		return v
 	}
 	// Default DSM on-prem client ID
-	return "Iv23liNcqXa5XNLu40Zj"
+	return "Ov23liAiIflSojRkX4HU"
 }
