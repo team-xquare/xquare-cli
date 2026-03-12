@@ -204,14 +204,13 @@ func (c *Client) DeleteApp(ctx context.Context, project, app string) error {
 	return c.delete(ctx, "/projects/"+project+"/apps/"+app)
 }
 
-func (c *Client) RedeployApp(ctx context.Context, project, app, githubToken string) (map[string]any, error) {
+func (c *Client) RedeployApp(ctx context.Context, project, app, _ string) (map[string]any, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		c.base+"/projects/"+project+"/apps/"+app+"/redeploy", nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("X-GitHub-Token", githubToken)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err

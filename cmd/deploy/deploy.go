@@ -36,12 +36,8 @@ func NewDeployCmd() *cobra.Command {
 				return err
 			}
 
-			sha := fmt.Sprintf("%v", result["sha"])
-			short := sha
-			if len(short) > 8 {
-				short = short[:8]
-			}
-			output.Success(fmt.Sprintf("redeploy triggered: %s/%s @ %s", project, appName, short))
+			buildID := fmt.Sprintf("%v", result["build"])
+			output.Success(fmt.Sprintf("build started: %s/%s  [%s]", project, appName, buildID))
 
 			if watch {
 				output.Info("watching deployment status (Ctrl+C to stop)...")
