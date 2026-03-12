@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"regexp"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -420,30 +421,39 @@ func waitPortReady(port int, timeout time.Duration) error {
 	return fmt.Errorf("port %d not ready after %s", port, timeout)
 }
 
-func runNativeClient(addonType, host, port, password, dbName string) error {
+func runNativeClient(addonType, host, port, password, addonName string) error {
+	db := addonDBName(addonName)
 	var args []string
 	var bin string
 
 	switch addonType {
 	case "mysql":
 		bin = "mysql"
-		args = []string{"-h", host, "-P", port, "-u", "root", dbName}
+		args = []string{"-h", host, "-P", port, "-u", "root", db}
 	case "postgresql":
 		bin = "psql"
-		args = []string{fmt.Sprintf("postgresql://postgres@%s:%s/%s", host, port, dbName)}
+		args = []string{fmt.Sprintf("postgresql://postgres@%s:%s/%s", host, port, db)}
 	case "redis":
 		bin = "redis-cli"
 		args = []string{"-h", host, "-p", port}
 	case "mongodb":
 		bin = "mongosh"
-		args = []string{fmt.Sprintf("mongodb://root@%s:%s/%s", host, port, dbName)}
+		args = []string{fmt.Sprintf("mongodb://%s:%s/%s", host, port, db)}
+	case "rabbitmq":
+		return fmt.Errorf("no CLI client for rabbitmq\nManagement UI: http://%s:15672  (guest/guest)\nConnection:    amqp://guest:guest@%s:%s/", host, host, port)
+	case "kafka":
+		return fmt.Errorf("no CLI client for kafka\nBootstrap server: %s:%s", host, port)
+	case "elasticsearch", "opensearch":
+		return fmt.Errorf("no CLI client for %s\nHTTP API: http://%s:%s", addonType, host, port)
+	case "qdrant":
+		return fmt.Errorf("no CLI client for qdrant\nHTTP API:  http://%s:%s\ngRPC:      %s:%s", host, port, host, "6334")
 	default:
 		return fmt.Errorf("no native client support for %s\nUse 'xquare addon tunnel --print-url'", addonType)
 	}
 
 	if _, err := exec.LookPath(bin); err != nil {
 		return fmt.Errorf("%s not found in PATH\nConnection: %s",
-			bin, connectionString(addonType, host, port, password, dbName))
+			bin, connectionString(addonType, host, port, password, addonName))
 	}
 
 	c := exec.Command(bin, args...)
@@ -453,17 +463,31 @@ func runNativeClient(addonType, host, port, password, dbName string) error {
 	return c.Run()
 }
 
-func connectionString(addonType, host, port, _, dbName string) string {
+// dbName converts addon name to database name (hyphens → underscores, matching addon.databaseName helm helper)
+func addonDBName(name string) string {
+	return strings.ReplaceAll(name, "-", "_")
+}
+
+func connectionString(addonType, host, port, _, addonName string) string {
+	db := addonDBName(addonName)
 	switch addonType {
 	case "mysql":
-		return fmt.Sprintf("mysql://root@%s:%s/%s", host, port, dbName)
+		return fmt.Sprintf("mysql://root@%s:%s/%s", host, port, db)
 	case "postgresql":
-		return fmt.Sprintf("postgresql://postgres@%s:%s/%s", host, port, dbName)
+		return fmt.Sprintf("postgresql://postgres@%s:%s/%s", host, port, db)
 	case "redis":
 		return fmt.Sprintf("redis://%s:%s", host, port)
 	case "mongodb":
-		return fmt.Sprintf("mongodb://root@%s:%s/%s", host, port, dbName)
+		return fmt.Sprintf("mongodb://%s:%s/%s", host, port, db)
+	case "rabbitmq":
+		return fmt.Sprintf("amqp://guest:guest@%s:%s/", host, port)
+	case "kafka":
+		return fmt.Sprintf("%s:%s", host, port) // bootstrap server
+	case "elasticsearch", "opensearch":
+		return fmt.Sprintf("http://%s:%s", host, port)
+	case "qdrant":
+		return fmt.Sprintf("http://%s:%s", host, port) // HTTP API (gRPC: port+1)
 	default:
-		return fmt.Sprintf("%s://root@%s:%s/%s", addonType, host, port, dbName)
+		return fmt.Sprintf("%s://%s:%s", addonType, host, port)
 	}
 }
