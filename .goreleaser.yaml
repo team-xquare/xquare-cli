@@ -28,22 +28,18 @@ builds:
 
 archives:
   - id: xquare
-    builds:
-      - xquare
     name_template: "xquare_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
-    files:
-      - LICENSE
-      - README.md
+        formats:
+          - zip
 
 checksum:
   name_template: "checksums.txt"
 
 changelog:
   sort: asc
-  use: github
+  use: git
   filters:
     exclude:
       - "^docs:"
