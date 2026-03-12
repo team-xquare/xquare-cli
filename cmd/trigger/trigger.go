@@ -24,7 +24,7 @@ Use trigger only when:
   - The automatic webhook failed (network issue, GitHub App misconfiguration)
   - You need to re-deploy without making a code change
   - You want to watch deployment progress with --watch`,
-		Args:  cobra.ExactArgs(1),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			project, err := api.RequireProject(cmd)
 			if err != nil {

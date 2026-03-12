@@ -164,7 +164,7 @@ CONSTRAINTS:
 - endpoints format: ["8080"] or ["8080:api.dsmhs.kr"] or ["8080:api.dsmhs.kr,admin.dsmhs.kr"] (repeatable for multiple ports)
 - GitHub App must be installed on the repo (error will include install URL if not)
 
-After creation, CI pipeline takes ~2-3 minutes to prepare. Then call trigger tool.`),
+After creation, CI pipeline takes ~2-3 minutes to initialize. Once ready, CI/CD will run automatically on every git push — you do NOT need to call the trigger tool. Use trigger only if the automatic webhook fails.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name: lowercase, hyphens ok, 2-63 chars")),
 				mcp.WithString("build_type", mcp.Required(), mcp.Description("gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),
@@ -716,6 +716,32 @@ BEFORE calling this tool you MUST:
 				return jsonResult(map[string]string{
 					"username": cfg.Username,
 					"server":   cfg.ServerURL,
+				}, nil)
+			})
+
+			s.AddTool(mcp.NewTool("get_dashboard_url",
+				mcp.WithDescription("Get the Grafana monitoring dashboard URL for an app or addon. Returns the URL to the project's observability dashboard."),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("name", mcp.Required(), mcp.Description("App or addon name")),
+				mcp.WithString("type", mcp.Description(`"app" (default) or "addon"`)),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project := req.GetString("project", "")
+				name := req.GetString("name", "")
+				kind := req.GetString("type", "app")
+				if project == "" || name == "" {
+					return mcp.NewToolResultError("project and name are required"), nil
+				}
+				var dashURL string
+				if kind == "addon" {
+					dashURL = fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/addon-%s", project, name)
+				} else {
+					dashURL = fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/app-%s", project, name)
+				}
+				return jsonResult(map[string]string{
+					"url":     dashURL,
+					"project": project,
+					"name":    name,
+					"type":    kind,
 				}, nil)
 			})
 

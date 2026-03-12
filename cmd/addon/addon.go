@@ -215,6 +215,7 @@ func newAddonGetCmd() *cobra.Command {
 				readyStr = "✓ 사용 가능"
 			}
 			addonType := fmt.Sprintf("%v", conn["type"])
+			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/addon-%s", project, addonName)
 			rows := [][]string{
 				{"Status", readyStr},
 				{"Type", addonType},
@@ -222,6 +223,7 @@ func newAddonGetCmd() *cobra.Command {
 				{"External Host", host},
 				{"Port", fmt.Sprintf("%v", conn["port"])},
 				{"Tunnel Key", fmt.Sprintf("%v", conn["password"])},
+				{"Dashboard", dashURL},
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
 			return nil
