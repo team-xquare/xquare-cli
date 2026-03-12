@@ -103,5 +103,5 @@ func defaultServerURL() string {
 	if v := os.Getenv("XQUARE_SERVER_URL"); v != "" {
 		return v
 	}
-	return "https://xquare-api.dsmhs.kr"
+	return "https://xquare-server.dsmhs.kr"
 }

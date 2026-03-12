@@ -11,14 +11,15 @@ import (
 	"github.com/team-xquare/xquare-cli/cmd/app"
 	"github.com/team-xquare/xquare-cli/cmd/auth"
 	"github.com/team-xquare/xquare-cli/cmd/deploy"
-	"github.com/team-xquare/xquare-cli/cmd/schema"
 	"github.com/team-xquare/xquare-cli/cmd/env"
 	"github.com/team-xquare/xquare-cli/cmd/logs"
 	"github.com/team-xquare/xquare-cli/cmd/mcp"
 	"github.com/team-xquare/xquare-cli/cmd/project"
+	"github.com/team-xquare/xquare-cli/cmd/schema"
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/config"
 	"github.com/team-xquare/xquare-cli/internal/output"
+	"github.com/team-xquare/xquare-cli/internal/updater"
 )
 
 var cliVersion = "dev"
@@ -45,6 +46,10 @@ var rootCmd = &cobra.Command{
 		jq, _ := cmd.Root().PersistentFlags().GetString("jq")
 		fields, _ := cmd.Root().PersistentFlags().GetStringSlice("fields")
 		output.SetGlobalFilters(jq, fields)
+		// Background version check — only in interactive terminal sessions
+		if !isJSON && !noInput && output.IsTTY() {
+			updater.CheckForUpdate(cliVersion)
+		}
 	},
 }
 
@@ -58,6 +63,7 @@ func init() {
 
 	rootCmd.AddCommand(
 		newVersionCmd(),
+		newUpgradeCmd(),
 		auth.NewAuthCmd(),
 		auth.NewLoginCmd(), // keep top-level `xquare login` shortcut
 		project.NewProjectCmd(),
@@ -110,6 +116,16 @@ func classifyError(msg string) string {
 		return "server_error"
 	default:
 		return "error"
+	}
+}
+
+func newUpgradeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "upgrade",
+		Short: "Upgrade xquare CLI to the latest version",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updater.Upgrade(cliVersion)
+		},
 	}
 }
 
