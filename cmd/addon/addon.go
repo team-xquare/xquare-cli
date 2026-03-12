@@ -136,6 +136,10 @@ func newAddonCreateCmd() *cobra.Command {
 				"storage": storage,
 			}
 			if bootstrap != "" {
+				const maxBootstrap = 32 * 1024 // 32 KiB, matches server limit
+				if len(bootstrap) > maxBootstrap {
+					return fmt.Errorf("bootstrap exceeds maximum size of %d bytes (%d bytes provided)", maxBootstrap, len(bootstrap))
+				}
 				body["bootstrap"] = bootstrap
 			}
 			result, err := c.CreateAddon(cmd.Context(), project, body)
