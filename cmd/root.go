@@ -15,6 +15,7 @@ import (
 	"github.com/team-xquare/xquare-cli/cmd/mcp"
 	"github.com/team-xquare/xquare-cli/cmd/project"
 	"github.com/team-xquare/xquare-cli/cmd/schema"
+	"github.com/team-xquare/xquare-cli/cmd/server"
 	"github.com/team-xquare/xquare-cli/cmd/trigger"
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/config"
@@ -69,6 +70,7 @@ func init() {
 		project.NewProjectCmd(),
 		app.NewAppCmd(),
 		trigger.NewTriggerCmd(),
+		server.NewServerCmd(),
 		env.NewEnvCmd(),
 		addon.NewAddonCmd(),
 		logs.NewLogsCmd(),

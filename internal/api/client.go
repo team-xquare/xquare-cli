@@ -313,6 +313,30 @@ func (c *Client) ListBuilds(ctx context.Context, project, app string) ([]map[str
 	return out.Builds, c.get(ctx, "/projects/"+project+"/apps/"+app+"/builds", &out)
 }
 
+// Allowlist API
+
+func (c *Client) ListAllowlist(ctx context.Context) ([]map[string]any, error) {
+	var resp struct {
+		Users []map[string]any `json:"users"`
+	}
+	if err := c.get(ctx, "/admin/allowlist", &resp); err != nil {
+		return nil, err
+	}
+	return resp.Users, nil
+}
+
+func (c *Client) AddAllowlist(ctx context.Context, username string) (map[string]any, error) {
+	var result map[string]any
+	if err := c.post(ctx, "/admin/allowlist", map[string]string{"username": username}, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *Client) RemoveAllowlist(ctx context.Context, username string) error {
+	return c.delete(ctx, "/admin/allowlist/"+username)
+}
+
 func (c *Client) StreamBuildLogs(ctx context.Context, project, app, workflow string, follow bool) (*http.Response, error) {
 	url := fmt.Sprintf("%s/projects/%s/apps/%s/builds/%s/logs", c.base, project, app, workflow)
 	if !follow {
