@@ -13,9 +13,10 @@ import (
 )
 
 type Client struct {
-	base       string
-	token      string
-	httpClient *http.Client
+	base         string
+	token        string
+	httpClient   *http.Client
+	streamClient *http.Client // no timeout — long-lived streaming; context handles cancellation
 }
 
 func New(base, token string) *Client {
@@ -26,11 +27,23 @@ func New(base, token string) *Client {
 			fmt.Fprintf(os.Stderr, "warn: server URL %q uses plain HTTP — credentials will be sent unencrypted\n", base)
 		}
 	}
+	// noRedirect prevents Bearer token leakage: a server-issued 3xx redirect
+	// would cause the Go HTTP client to forward the Authorization header to the
+	// redirect target. Both regular and streaming clients reject redirects.
+	noRedirect := func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 	return &Client{
 		base:  base,
 		token: token,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:       30 * time.Second,
+			CheckRedirect: noRedirect,
+		},
+		streamClient: &http.Client{
+			// No global timeout: streaming connections are long-lived.
+			// The caller's context (cmd.Context()) handles cancellation.
+			CheckRedirect: noRedirect,
 		},
 	}
 }
@@ -311,7 +324,7 @@ func (c *Client) StreamLogs(ctx context.Context, project, app string, tail int64
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
-	return (&http.Client{}).Do(req)
+	return c.streamClient.Do(req)
 }
 
 // Builds
@@ -358,5 +371,5 @@ func (c *Client) StreamBuildLogs(ctx context.Context, project, app, workflow str
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
-	return (&http.Client{}).Do(req)
+	return c.streamClient.Do(req)
 }
