@@ -96,7 +96,7 @@ func SaveProject(cfg *ProjectConfig) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(configDir, "config"), data, 0644)
+	return os.WriteFile(filepath.Join(configDir, "config"), data, 0600)
 }
 
 func defaultServerURL() string {
