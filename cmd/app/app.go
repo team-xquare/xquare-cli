@@ -791,10 +791,10 @@ func newAppTunnelCmd() *cobra.Command {
 			localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, appName, tunnelPort)
 			proc := exec.Command(wstunnelBin, "client",
 				"-L", localArg,
-				"--http-upgrade-path-prefix", password,
 				"--log-lvl", "OFF",
 				fmt.Sprintf("wss://%s", tunnelHost),
 			)
+			proc.Env = append(os.Environ(), "WSTUNNEL_HTTP_UPGRADE_PATH_PREFIX="+password)
 			proc.Stdout = os.Stdout
 			proc.Stderr = os.Stderr
 			if err := proc.Start(); err != nil {
