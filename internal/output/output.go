@@ -169,6 +169,18 @@ func JSONWithFilter(v any, jqExpr string, fields []string) error {
 		if err != nil {
 			return fmt.Errorf("jq: %w", err)
 		}
+		// jq may produce multiple values (e.g. ".[]" on an array).
+		// Print each value on its own line, matching real jq behavior.
+		if results, ok := raw.(*jqResults); ok {
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			for _, val := range results.values {
+				if err := enc.Encode(val); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
