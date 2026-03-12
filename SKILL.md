@@ -97,6 +97,29 @@ xquare app tunnel my-api                  # tunnel to app's service port
 xquare app tunnel my-api --port 9090      # specific port if multiple endpoints
 ```
 
+## In-Cluster DNS (app ↔ app, app ↔ addon)
+
+Apps and addons within the **same project** can communicate directly using the app/addon name as the hostname.
+
+```
+http://<app-name>:<port>          # app to app
+redis://<addon-name>:6379         # app to redis
+mysql://<addon-name>:3306         # app to mysql
+postgresql://<addon-name>:5432    # app to postgresql
+```
+
+Examples:
+```bash
+# backend app calling frontend or another service
+http://my-api:8080/health
+
+# backend app connecting to its database addon named "mydb"
+DB_HOST=mydb
+DB_PORT=5432
+```
+
+> No namespace or full DNS suffix needed — just use the name as-is.
+
 ## Dangerous Commands (require --yes)
 
 ```bash

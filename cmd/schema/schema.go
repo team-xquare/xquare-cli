@@ -60,6 +60,9 @@ func buildSchema() map[string]any {
 			{Name: "jq", Type: "string", Desc: "filter JSON output with jq expression"},
 			{Name: "fields", Type: "string", Desc: "comma-separated fields to include in JSON output"},
 		},
+		"networking": map[string]string{
+			"in_cluster_dns": "Apps and addons in the same project communicate using the name as hostname. Example: DB_HOST=mydb (addon named 'mydb'), http://my-api:8080 (app named 'my-api'). No namespace suffix needed.",
+		},
 		"constraints": map[string]string{
 			"project_name":  "lowercase letters and numbers only, no hyphens, 2-63 chars. Example: myproject, dsm2025",
 			"app_name":      "lowercase letters, numbers, hyphens allowed, 2-63 chars, cannot start/end with hyphen. Example: my-api, backend",

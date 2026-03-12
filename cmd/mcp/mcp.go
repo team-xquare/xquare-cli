@@ -480,7 +480,7 @@ CONSTRAINTS:
 			})
 
 			s.AddTool(mcp.NewTool("get_addon_connection",
-				mcp.WithDescription("Get connection info for an addon (host, port, password). The password is the wstunnel access key for tunneling."),
+				mcp.WithDescription("Get connection info for an addon (host, port, password). The password is the wstunnel access key for tunneling. NOTE: from inside the cluster (another app in the same project), use the addon name directly as hostname — e.g. DB_HOST=mydb, not the external host."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("addon", mcp.Required(), mcp.Description("Addon name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
