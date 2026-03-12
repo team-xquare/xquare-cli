@@ -113,6 +113,26 @@ https://{project}-observability-dashboard.dsmhs.kr/d/app-{name}    # app
 https://{project}-observability-dashboard.dsmhs.kr/d/addon-{name}  # addon
 ```
 
+## Addon credentials — NO password required
+
+xquare addons have **no password**. Connect without any credentials:
+
+| Type | DB_USER | DB_PASSWORD |
+|------|---------|-------------|
+| postgresql | `postgres` | (empty) |
+| mysql | `root` | (empty) |
+| redis | — | (no auth) |
+| mongodb | — | (no auth) |
+
+Example env vars for a postgresql addon named `db`:
+```
+DB_HOST=db
+DB_PORT=5432
+DB_USER=postgres
+DB_NAME=db
+# DB_PASSWORD → do NOT set, leave empty
+```
+
 ## In-Cluster DNS (app ↔ app, app ↔ addon)
 
 Apps and addons within the **same project** can communicate directly using the app/addon name as the hostname.

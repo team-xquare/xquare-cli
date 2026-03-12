@@ -510,7 +510,19 @@ BEFORE calling this tool you MUST:
 			})
 
 			s.AddTool(mcp.NewTool("get_addon_status",
-				mcp.WithDescription("Get status and connection info for an addon. NOTE: from inside the cluster (another app in the same project), use the addon name directly as hostname — e.g. DB_HOST=mydb. For local tunneling use 'xquare addon tunnel' CLI command."),
+				mcp.WithDescription(`Get status and connection info for an addon.
+
+IMPORTANT — no password required: xquare addons have NO password. Connect without any credentials.
+- DB_HOST = addon name (e.g. "db")
+- DB_PORT = port from this response
+- DB_USER = "postgres" (postgresql) / "root" (mysql) / no auth (redis, mongodb)
+- DB_PASSWORD = leave empty / omit entirely
+- DB_NAME = same as addon name
+
+Example env vars for a postgresql addon named "db":
+  DB_HOST=db  DB_PORT=5432  DB_USER=postgres  DB_NAME=db  (no password)
+
+For local tunneling use 'xquare addon tunnel' CLI command.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("addon", mcp.Required(), mcp.Description("Addon name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -527,12 +539,27 @@ BEFORE calling this tool you MUST:
 					return jsonResult(nil, err)
 				}
 				// Strip internal tunnel credentials from MCP response
+				addonType := fmt.Sprintf("%v", data["type"])
+				defaultUser := map[string]string{
+					"postgresql": "postgres",
+					"mysql":      "root",
+					"mongodb":    "(no auth)",
+					"redis":      "(no auth)",
+				}[addonType]
+				if defaultUser == "" {
+					defaultUser = "(no auth)"
+				}
 				safe := map[string]any{
-					"name":  addon,
-					"type":  data["type"],
-					"ready": data["ready"],
-					"port":  data["port"],
-					"note":  fmt.Sprintf("In-cluster host: %s (use as DB_HOST inside your app)", addon),
+					"name":         addon,
+					"type":         addonType,
+					"ready":        data["ready"],
+					"port":         data["port"],
+					"db_host":      addon,
+					"db_port":      data["port"],
+					"db_user":      defaultUser,
+					"db_password":  "(none — no password required)",
+					"db_name":      addon,
+					"note":         "No password needed. Connect directly using the addon name as hostname inside your app.",
 				}
 				return jsonResult(safe, nil)
 			})
