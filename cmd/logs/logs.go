@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -11,6 +12,12 @@ import (
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
+
+// ansiEscapeRe matches ANSI/VT100 escape sequences (CSI, OSC, etc.).
+// Strips them before printing to prevent terminal injection attacks.
+var ansiEscapeRe = regexp.MustCompile(`\x1b(?:[@-Z\\-_]|\[[0-9;]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))`)
+
+func stripANSI(s string) string { return ansiEscapeRe.ReplaceAllString(s, "") }
 
 func NewLogsCmd() *cobra.Command {
 	var tail int64
@@ -77,7 +84,7 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 		if isJSON {
 			_ = output.NDJSONLine(map[string]string{"line": line})
 		} else {
-			fmt.Println(line)
+			fmt.Println(stripANSI(line))
 		}
 		select {
 		case <-cmd.Context().Done():

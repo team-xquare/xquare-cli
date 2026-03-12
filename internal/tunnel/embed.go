@@ -32,7 +32,7 @@ func ExtractWstunnel() (path string, cleanup func(), err error) {
 				return "", nil, fmt.Errorf("write binary: %w", writeErr)
 			}
 			tmp.Close()
-			if chmodErr := os.Chmod(tmp.Name(), 0755); chmodErr != nil {
+			if chmodErr := os.Chmod(tmp.Name(), 0700); chmodErr != nil {
 				os.Remove(tmp.Name())
 				return "", nil, fmt.Errorf("chmod: %w", chmodErr)
 			}
