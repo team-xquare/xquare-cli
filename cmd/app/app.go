@@ -235,9 +235,9 @@ func newStatusCmd() *cobra.Command {
 
 			if appStatus == "not_deployed" {
 				if !ciReady {
-					rows = append(rows, []string{"Hint", "CI pipeline preparing... try xquare deploy in a minute"})
+					rows = append(rows, []string{"Hint", "CI pipeline preparing... try xquare trigger in a minute"})
 				} else {
-					rows = append(rows, []string{"Hint", fmt.Sprintf("run: xquare deploy %s --watch", args[0])})
+					rows = append(rows, []string{"Hint", fmt.Sprintf("run: xquare trigger %s --watch", args[0])})
 				}
 			}
 
@@ -343,7 +343,7 @@ func newCreateCmd() *cobra.Command {
 			output.Info("")
 			output.Info("CI/CD 파이프라인 준비 중... (약 2~3분 소요)")
 			output.Info("준비 완료 후:")
-			output.Info(fmt.Sprintf("  xquare deploy %s --watch        # 첫 배포 시작 + 완료까지 대기", appName))
+			output.Info(fmt.Sprintf("  xquare trigger %s --watch        # 첫 배포 시작 + 완료까지 대기", appName))
 			output.Info(fmt.Sprintf("  xquare env set %s KEY=value     # 환경변수 설정", appName))
 			return nil
 		},

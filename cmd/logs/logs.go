@@ -61,7 +61,7 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 		}
 		_ = json.NewDecoder(resp.Body).Decode(&e)
 		if e.Code == "not_deployed" {
-			return fmt.Errorf("%s\n\n  xquare deploy %s --watch   # 배포 시작", e.Error, appName)
+			return fmt.Errorf("%s\n\n  xquare trigger %s --watch   # 배포 시작", e.Error, appName)
 		}
 		return fmt.Errorf("app %q not found in project %q\n\n  xquare app list   # list apps in this project", appName, project)
 	}
@@ -95,7 +95,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 			return fmt.Errorf("list builds: %w", err)
 		}
 		if len(builds) == 0 {
-			return fmt.Errorf("빌드 기록이 없습니다\n\n  xquare deploy %s   # 첫 배포 시작", appName)
+			return fmt.Errorf("빌드 기록이 없습니다\n\n  xquare trigger %s   # 첫 배포 시작", appName)
 		}
 		buildID = fmt.Sprintf("%v", builds[0]["id"])
 		buildStatus := fmt.Sprintf("%v", builds[0]["status"])
