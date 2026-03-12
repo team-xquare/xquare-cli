@@ -261,9 +261,9 @@ func newAddonConnectCmd() *cobra.Command {
 				localPort = tunnelPort
 			}
 
-			wstunnelBin, tmpPath, err := resolveBinary()
-			if tmpPath != "" {
-				defer os.Remove(tmpPath)
+			wstunnelBin, cleanupBin, err := resolveBinary()
+			if cleanupBin != nil {
+				defer cleanupBin()
 			}
 			if err != nil {
 				return err
@@ -331,9 +331,9 @@ func newAddonTunnelCmd() *cobra.Command {
 				return nil
 			}
 
-			wstunnelBin, tmpPath, err := resolveBinary()
-			if tmpPath != "" {
-				defer os.Remove(tmpPath)
+			wstunnelBin, cleanupBin, err := resolveBinary()
+			if cleanupBin != nil {
+				defer cleanupBin()
 			}
 			if err != nil {
 				return err
@@ -373,16 +373,8 @@ func newAddonTunnelCmd() *cobra.Command {
 	return cmd
 }
 
-func resolveBinary() (binPath, tmpPath string, err error) {
-	tmp, extractErr := tunnel.ExtractWstunnel()
-	if extractErr == nil {
-		return tmp, tmp, nil
-	}
-	sys, sysErr := exec.LookPath("wstunnel")
-	if sysErr == nil {
-		return sys, "", nil
-	}
-	return "", "", fmt.Errorf("wstunnel not available: %v", extractErr)
+func resolveBinary() (binPath string, cleanup func(), err error) {
+	return tunnel.ExtractWstunnel()
 }
 
 func startTunnelProc(bin, tunnelHost, password, serviceName string, servicePort, localPort int) (*os.Process, error) {
