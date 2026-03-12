@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -64,20 +66,36 @@ func receiveOAuthCode() (string, error) {
 	cfg, _ := config.LoadGlobal()
 	clientID := getClientID(cfg.ServerURL)
 
+	// Generate a random state token to prevent CSRF attacks.
+	stateBytes := make([]byte, 16)
+	if _, err := rand.Read(stateBytes); err != nil {
+		return "", fmt.Errorf("generate oauth state: %w", err)
+	}
+	state := hex.EncodeToString(stateBytes)
+
 	authURL := fmt.Sprintf(
-		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=read:user",
-		clientID, "http://localhost:9999/callback",
+		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=read:user&state=%s",
+		clientID, "http://localhost:9999/callback", state,
 	)
 
 	output.Info("Open this URL in your browser:")
 	output.Info(authURL)
 
 	srv := &http.Server{Addr: ":9999"}
-	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	srv.Handler = mux
+	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("state") != state {
+			errCh <- fmt.Errorf("oauth state mismatch: possible CSRF attack")
+			http.Error(w, "Authentication failed: state mismatch.", http.StatusBadRequest)
+			go func() { _ = srv.Close() }()
+			return
+		}
 		code := r.URL.Query().Get("code")
 		if code == "" {
 			errCh <- fmt.Errorf("no code in callback")
 			fmt.Fprintln(w, "Authentication failed. You can close this tab.")
+			go func() { _ = srv.Close() }()
 			return
 		}
 		codeCh <- code

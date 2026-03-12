@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -186,7 +187,7 @@ func (c *Client) AddMember(ctx context.Context, project, username string) error 
 }
 
 func (c *Client) RemoveMember(ctx context.Context, project, username string) error {
-	return c.delete(ctx, "/projects/"+project+"/members/"+username)
+	return c.delete(ctx, "/projects/"+url.PathEscape(project)+"/members/"+url.PathEscape(username))
 }
 
 // Apps
@@ -256,7 +257,7 @@ func (c *Client) PatchEnv(ctx context.Context, project, app string, envs map[str
 }
 
 func (c *Client) DeleteEnvKey(ctx context.Context, project, app, key string) error {
-	return c.delete(ctx, "/projects/"+project+"/apps/"+app+"/env/"+key)
+	return c.delete(ctx, "/projects/"+url.PathEscape(project)+"/apps/"+url.PathEscape(app)+"/env/"+url.PathEscape(key))
 }
 
 // Addons
@@ -289,14 +290,15 @@ func (c *Client) GetAppTunnel(ctx context.Context, project, app string) (map[str
 
 // Logs — returns the raw response for streaming
 func (c *Client) StreamLogs(ctx context.Context, project, app string, tail int64, follow bool, since string) (*http.Response, error) {
-	url := fmt.Sprintf("%s/projects/%s/apps/%s/logs?tail=%d", c.base, project, app, tail)
+	rawURL := fmt.Sprintf("%s/projects/%s/apps/%s/logs?tail=%d",
+		c.base, url.PathEscape(project), url.PathEscape(app), tail)
 	if !follow {
-		url += "&follow=false"
+		rawURL += "&follow=false"
 	}
 	if since != "" {
-		url += "&since=" + since
+		rawURL += "&since=" + url.QueryEscape(since)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -334,15 +336,16 @@ func (c *Client) AddAllowlist(ctx context.Context, username string) (map[string]
 }
 
 func (c *Client) RemoveAllowlist(ctx context.Context, username string) error {
-	return c.delete(ctx, "/admin/allowlist/"+username)
+	return c.delete(ctx, "/admin/allowlist/"+url.PathEscape(username))
 }
 
 func (c *Client) StreamBuildLogs(ctx context.Context, project, app, workflow string, follow bool) (*http.Response, error) {
-	url := fmt.Sprintf("%s/projects/%s/apps/%s/builds/%s/logs", c.base, project, app, workflow)
+	rawURL := fmt.Sprintf("%s/projects/%s/apps/%s/builds/%s/logs",
+		c.base, url.PathEscape(project), url.PathEscape(app), url.PathEscape(workflow))
 	if !follow {
-		url += "?follow=false"
+		rawURL += "?follow=false"
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
