@@ -13,6 +13,7 @@ and environment variables on an on-premises Kubernetes cluster.
 xquare login                    # authenticate with GitHub (opens browser)
 xquare link <project>           # set default project for current directory
 xquare schema                   # see all commands, constraints, valid values
+xquare upgrade                  # upgrade CLI to the latest version
 ```
 
 ## Critical Constraints

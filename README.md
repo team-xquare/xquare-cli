@@ -32,6 +32,7 @@ xquare login                  # GitHub 인증
 xquare link <project>         # 현재 디렉토리에 프로젝트 연결
 xquare app list               # 앱 목록
 xquare trigger <app>          # CI/CD 수동 트리거
+xquare upgrade                # 최신 버전으로 업데이트
 ```
 
 ---

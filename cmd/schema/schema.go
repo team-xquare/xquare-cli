@@ -72,6 +72,16 @@ func buildSchema() map[string]any {
 		},
 		"commands": []CommandSchema{
 			{
+				Command:     "version",
+				Description: "Print CLI version information.",
+				Examples:    []string{"xquare version", "xquare version --json"},
+			},
+			{
+				Command:     "upgrade",
+				Description: "Upgrade the xquare CLI to the latest version. Downloads the latest release from GitHub and replaces the current binary.",
+				Examples:    []string{"xquare upgrade"},
+			},
+			{
 				Command:     "link <project>",
 				Description: "Link current directory to a project. Run this first before other commands.",
 				Args:        []ArgSchema{{Name: "project", Required: true, Desc: "project name"}},
