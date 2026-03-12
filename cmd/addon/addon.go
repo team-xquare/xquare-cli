@@ -411,16 +411,16 @@ func runNativeClient(addonType, host, port, password, dbName string) error {
 	switch addonType {
 	case "mysql":
 		bin = "mysql"
-		args = []string{"-h", host, "-P", port, "-u", "root", "-p" + password, dbName}
+		args = []string{"-h", host, "-P", port, "-u", "root", dbName}
 	case "postgresql":
 		bin = "psql"
-		args = []string{fmt.Sprintf("postgresql://postgres:%s@%s:%s/%s", password, host, port, dbName)}
+		args = []string{fmt.Sprintf("postgresql://postgres@%s:%s/%s", host, port, dbName)}
 	case "redis":
 		bin = "redis-cli"
-		args = []string{"-h", host, "-p", port, "-a", password}
+		args = []string{"-h", host, "-p", port}
 	case "mongodb":
 		bin = "mongosh"
-		args = []string{fmt.Sprintf("mongodb://root:%s@%s:%s/%s", password, host, port, dbName)}
+		args = []string{fmt.Sprintf("mongodb://root@%s:%s/%s", host, port, dbName)}
 	default:
 		return fmt.Errorf("no native client support for %s\nUse 'xquare addon tunnel --print-url'", addonType)
 	}
@@ -437,17 +437,17 @@ func runNativeClient(addonType, host, port, password, dbName string) error {
 	return c.Run()
 }
 
-func connectionString(addonType, host, port, password, dbName string) string {
+func connectionString(addonType, host, port, _, dbName string) string {
 	switch addonType {
 	case "mysql":
-		return fmt.Sprintf("mysql://root:%s@%s:%s/%s", password, host, port, dbName)
+		return fmt.Sprintf("mysql://root@%s:%s/%s", host, port, dbName)
 	case "postgresql":
-		return fmt.Sprintf("postgresql://postgres:%s@%s:%s/%s", password, host, port, dbName)
+		return fmt.Sprintf("postgresql://postgres@%s:%s/%s", host, port, dbName)
 	case "redis":
-		return fmt.Sprintf("redis://:%s@%s:%s", password, host, port)
+		return fmt.Sprintf("redis://%s:%s", host, port)
 	case "mongodb":
-		return fmt.Sprintf("mongodb://root:%s@%s:%s/%s", password, host, port, dbName)
+		return fmt.Sprintf("mongodb://root@%s:%s/%s", host, port, dbName)
 	default:
-		return fmt.Sprintf("%s://root:%s@%s:%s/%s", addonType, password, host, port, dbName)
+		return fmt.Sprintf("%s://root@%s:%s/%s", addonType, host, port, dbName)
 	}
 }
