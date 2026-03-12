@@ -47,13 +47,18 @@ func newAddonListCmd() *cobra.Command {
 			}
 			rows := make([][]string, 0, len(addons))
 			for _, a := range addons {
+				readyStr := "⏳ 프로비저닝 중"
+				if fmt.Sprintf("%v", a["ready"]) == "true" {
+					readyStr = "✓ 사용 가능"
+				}
 				rows = append(rows, []string{
 					fmt.Sprintf("%v", a["name"]),
 					fmt.Sprintf("%v", a["type"]),
 					fmt.Sprintf("%v", a["storage"]),
+					readyStr,
 				})
 			}
-			output.Table([]string{"NAME", "TYPE", "STORAGE"}, rows)
+			output.Table([]string{"NAME", "TYPE", "STORAGE", "STATUS"}, rows)
 			return nil
 		},
 	}
@@ -94,6 +99,8 @@ func newAddonCreateCmd() *cobra.Command {
 				return output.JSON(result)
 			}
 			output.Success(fmt.Sprintf("created addon '%s' (%s)", args[0], args[1]))
+			output.Info("DB 프로비저닝 중... (약 1~2분 소요)")
+			output.Info(fmt.Sprintf("  xquare addon list   # 준비 상태 확인"))
 			return nil
 		},
 	}
@@ -152,7 +159,12 @@ func newAddonConnectionCmd() *cobra.Command {
 			if api.IsJSON(cmd) {
 				return output.JSON(conn)
 			}
+			readyStr := "⏳ 프로비저닝 중 (아직 접속 불가)"
+			if fmt.Sprintf("%v", conn["ready"]) == "true" {
+				readyStr = "✓ 사용 가능"
+			}
 			rows := [][]string{
+				{"Status", readyStr},
 				{"Type", fmt.Sprintf("%v", conn["type"])},
 				{"Host", fmt.Sprintf("%v", conn["host"])},
 				{"Port", fmt.Sprintf("%v", conn["port"])},

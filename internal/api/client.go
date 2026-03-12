@@ -112,14 +112,23 @@ func decode(resp *http.Response, out any) error {
 func parseError(resp *http.Response) error {
 	var e struct {
 		Error      string `json:"error"`
+		Code       string `json:"code"`
 		InstallURL string `json:"install_url"`
+		RetryIn    int    `json:"retryIn"`
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&e)
 	if e.Error != "" {
 		if e.InstallURL != "" {
 			return fmt.Errorf("%s\n\nInstall the GitHub App at: %s", e.Error, e.InstallURL)
 		}
-		return fmt.Errorf("server error %d: %s", resp.StatusCode, e.Error)
+		if e.Code == "ci_not_ready" {
+			hint := ""
+			if e.RetryIn > 0 {
+				hint = fmt.Sprintf("\n\n약 %d초 후 다시 시도하세요.", e.RetryIn)
+			}
+			return fmt.Errorf("%s%s", e.Error, hint)
+		}
+		return fmt.Errorf("%s", e.Error)
 	}
 	return fmt.Errorf("server error %d", resp.StatusCode)
 }

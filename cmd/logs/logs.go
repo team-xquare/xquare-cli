@@ -2,7 +2,9 @@ package logs
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -51,6 +53,18 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 404 {
+		// Try to parse not_deployed error
+		var e struct {
+			Error string `json:"error"`
+			Code  string `json:"code"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&e)
+		if e.Code == "not_deployed" {
+			return fmt.Errorf("%s\n\n  xquare deploy %s --watch   # 배포 시작", e.Error, appName)
+		}
+		return fmt.Errorf("app not found")
+	}
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("server error: %d", resp.StatusCode)
 	}
@@ -80,37 +94,82 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 			return fmt.Errorf("list builds: %w", err)
 		}
 		if len(builds) == 0 {
-			return fmt.Errorf("no builds found for %s/%s\n\nPush code or run: xquare deploy %s", project, appName, appName)
+			return fmt.Errorf("빌드 기록이 없습니다\n\n  xquare deploy %s   # 첫 배포 시작", appName)
 		}
 		buildID = fmt.Sprintf("%v", builds[0]["id"])
 		buildStatus := fmt.Sprintf("%v", builds[0]["status"])
 		output.Info(fmt.Sprintf("build: %s  [%s]", buildID, buildStatus))
 	}
 
-	resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, buildID, follow)
-	if err != nil {
-		return fmt.Errorf("stream build logs: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("server error: %d", resp.StatusCode)
-	}
-
-	isJSON := api.IsJSON(cmd)
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if isJSON {
-			_ = output.NDJSONLine(map[string]string{"line": line})
-		} else {
-			fmt.Println(line)
-		}
+	// Auto-reconnect loop for running builds
+	maxRetries := 10
+	for attempt := 0; attempt <= maxRetries; attempt++ {
 		select {
 		case <-cmd.Context().Done():
 			return nil
 		default:
 		}
+
+		if attempt > 0 {
+			// Check if build is still running before reconnecting
+			builds, err := c.ListBuilds(cmd.Context(), project, appName)
+			if err == nil {
+				for _, b := range builds {
+					if fmt.Sprintf("%v", b["id"]) == buildID {
+						s := fmt.Sprintf("%v", b["status"])
+						if s != "running" && s != "pending" {
+							// Build finished, no need to reconnect
+							return nil
+						}
+					}
+				}
+			}
+			output.Info("  연결이 끊어졌습니다. 재연결 중...")
+			time.Sleep(2 * time.Second)
+		}
+
+		resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, buildID, follow)
+		if err != nil {
+			if attempt == maxRetries {
+				return fmt.Errorf("stream build logs: %w", err)
+			}
+			continue
+		}
+
+		if resp.StatusCode >= 400 {
+			resp.Body.Close()
+			if attempt == maxRetries {
+				return fmt.Errorf("server error: %d", resp.StatusCode)
+			}
+			continue
+		}
+
+		isJSON := api.IsJSON(cmd)
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if isJSON {
+				_ = output.NDJSONLine(map[string]string{"line": line})
+			} else {
+				fmt.Println(line)
+			}
+			select {
+			case <-cmd.Context().Done():
+				resp.Body.Close()
+				return nil
+			default:
+			}
+		}
+		resp.Body.Close()
+
+		// If not following, don't reconnect
+		if !follow {
+			return scanner.Err()
+		}
+		// If scanner ended cleanly and we're following, check if build completed
+		if scanner.Err() == nil {
+			return nil
+		}
 	}
-	return scanner.Err()
+	return nil
 }
