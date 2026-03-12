@@ -1,15 +1,21 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"net"
 	"os/exec"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/output"
+	"github.com/team-xquare/xquare-cli/internal/tunnel"
 )
 
 func NewDBCmd() *cobra.Command {
@@ -27,9 +33,10 @@ func NewDBCmd() *cobra.Command {
 // xquare db connect <addon> — starts tunnel then connects using native client
 func newDBConnectCmd() *cobra.Command {
 	var localPort int
-	return &cobra.Command{
+
+	cmd := &cobra.Command{
 		Use:   "connect <addon>",
-		Short: "Open an interactive DB session via tunnel (requires native client installed)",
+		Short: "Open an interactive DB session (starts tunnel automatically)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := api.FromCmd(cmd)
@@ -53,40 +60,47 @@ func newDBConnectCmd() *cobra.Command {
 				localPort = tunnelPort
 			}
 
-			// Check wstunnel is available
-			if _, err := exec.LookPath("wstunnel"); err != nil {
-				return fmt.Errorf("wstunnel not found in PATH\n\nInstall from: https://github.com/erebe/wstunnel/releases\nOr use Docker: docker run -p %d:%d -e PASSWORD=%s -e SERVICE_NAME=%s -e SERVICE_PORT=%d -e PROJECT_NAME=%s ghcr.io/erebe/wstunnel client ...",
-					localPort, tunnelPort, password, addonName, tunnelPort, project)
+			output.Info(fmt.Sprintf("starting tunnel: localhost:%d → %s:%s:%d", localPort, tunnelHost, addonName, tunnelPort))
+
+			// Start tunnel in background goroutine
+			tun := &tunnel.Tunnel{
+				TunnelHost:    tunnelHost,
+				Password:      password,
+				TargetService: addonName,
+				TargetPort:    tunnelPort,
+				LocalPort:     localPort,
 			}
 
-			// Start wstunnel in background
-			localArg := fmt.Sprintf("tcp://127.0.0.1:%d:%s:%d", localPort, addonName, tunnelPort)
-			tunnel := exec.Command("wstunnel", "client",
-				"-L", localArg,
-				"--http-upgrade-path-prefix", password,
-				"--log-lvl", "OFF",
-				fmt.Sprintf("wss://%s", tunnelHost),
-			)
-			if err := tunnel.Start(); err != nil {
-				return fmt.Errorf("start wstunnel: %w", err)
-			}
-			defer tunnel.Process.Kill()
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
 
-			output.Info(fmt.Sprintf("tunnel: localhost:%d → %s:%d", localPort, addonName, tunnelPort))
+			errCh := make(chan error, 1)
+			go func() {
+				errCh <- tun.Start(ctx)
+			}()
 
-			return runNativeClient(addonType, "127.0.0.1", strconv.Itoa(localPort), password, addonName)
+			// Wait briefly for listener to be ready
+			<-waitReady(localPort)
+
+			output.Info(fmt.Sprintf("tunnel ready — connecting to %s...", addonType))
+
+			err = runNativeClient(addonType, "127.0.0.1", strconv.Itoa(localPort), password, addonName)
+			cancel()
+			return err
 		},
 	}
+	cmd.Flags().IntVar(&localPort, "local-port", 0, "local port (defaults to service port)")
+	return cmd
 }
 
-// xquare db tunnel <addon> — starts wstunnel port forwarding
+// xquare db tunnel <addon> — starts pure-Go WebSocket tunnel
 func newDBTunnelCmd() *cobra.Command {
 	var localPort int
 	var printURL bool
 
 	cmd := &cobra.Command{
 		Use:   "tunnel <addon>",
-		Short: "Open a local port tunnel to the database (requires wstunnel)",
+		Short: "Open a local port tunnel to the database (no external tools needed)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := api.FromCmd(cmd)
@@ -117,20 +131,54 @@ func newDBTunnelCmd() *cobra.Command {
 				return nil
 			}
 
-			if _, err := exec.LookPath("wstunnel"); err != nil {
-				return fmt.Errorf("wstunnel not found in PATH\n\nInstall from: https://github.com/erebe/wstunnel/releases")
-			}
-
 			output.Info(fmt.Sprintf("tunneling localhost:%d → %s:%s:%d", localPort, tunnelHost, addonName, tunnelPort))
-			output.Info(fmt.Sprintf("connection string: %s", connStr))
+			output.Info(fmt.Sprintf("connection: %s", connStr))
 			output.Info("press Ctrl+C to stop")
 
-			return startWSTunnel(tunnelHost, addonName, tunnelPort, localPort, password)
+			tun := &tunnel.Tunnel{
+				TunnelHost:    tunnelHost,
+				Password:      password,
+				TargetService: addonName,
+				TargetPort:    tunnelPort,
+				LocalPort:     localPort,
+			}
+
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
+			// Handle Ctrl+C
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+			go func() {
+				<-sigCh
+				output.Info("\ntunnel closed")
+				cancel()
+			}()
+
+			return tun.Start(ctx)
 		},
 	}
 	cmd.Flags().IntVar(&localPort, "local-port", 0, "local port (defaults to service port)")
 	cmd.Flags().BoolVar(&printURL, "print-url", false, "print connection string only (non-interactive)")
 	return cmd
+}
+
+// waitReady polls until the local port is listening (up to 2s)
+func waitReady(port int) <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		for i := 0; i < 20; i++ {
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 100*time.Millisecond)
+			if err == nil {
+				conn.Close()
+				close(ch)
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		close(ch)
+	}()
+	return ch
 }
 
 func runNativeClient(addonType, host, port, password, dbName string) error {
@@ -151,11 +199,12 @@ func runNativeClient(addonType, host, port, password, dbName string) error {
 		bin = "mongosh"
 		args = []string{fmt.Sprintf("mongodb://root:%s@%s:%s/%s", password, host, port, dbName)}
 	default:
-		return fmt.Errorf("no native client support for addon type: %s\nUse 'xquare db tunnel' to set up port forwarding", addonType)
+		return fmt.Errorf("no native client support for %s\nUse 'xquare db tunnel --print-url' for the connection string", addonType)
 	}
 
 	if _, err := exec.LookPath(bin); err != nil {
-		return fmt.Errorf("%s not found in PATH — install it first\nOr use 'xquare db tunnel --print-url' for the connection string", bin)
+		return fmt.Errorf("%s not found in PATH\nConnection string: %s",
+			bin, connectionString(addonType, host, port, password, dbName))
 	}
 
 	c := exec.Command(bin, args...)
@@ -176,29 +225,6 @@ func connectionString(addonType, host, port, password, dbName string) string {
 	case "mongodb":
 		return fmt.Sprintf("mongodb://root:%s@%s:%s/%s", password, host, port, dbName)
 	default:
-		return fmt.Sprintf("%s://%s:%s@%s:%s", addonType, "root", password, host, port)
+		return fmt.Sprintf("%s://root:%s@%s:%s/%s", addonType, password, host, port, dbName)
 	}
-}
-
-func startWSTunnel(tunnelHost, serviceName string, servicePort, localPort int, password string) error {
-	bin, err := exec.LookPath("wstunnel")
-	if err != nil {
-		return fmt.Errorf("wstunnel not found in PATH\n\nInstall from: https://github.com/erebe/wstunnel/releases")
-	}
-
-	// wstunnel client -L tcp://127.0.0.1:{localPort}:{serviceName}:{servicePort} \
-	//   --http-upgrade-path-prefix {password} \
-	//   --log-lvl OFF wss://{tunnelHost}
-	localArg := fmt.Sprintf("tcp://127.0.0.1:%d:%s:%d", localPort, serviceName, servicePort)
-
-	c := exec.Command(bin, "client",
-		"-L", localArg,
-		"--http-upgrade-path-prefix", password,
-		"--log-lvl", "OFF",
-		fmt.Sprintf("wss://%s", tunnelHost),
-	)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c.Run()
 }
