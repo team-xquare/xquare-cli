@@ -21,6 +21,17 @@ import (
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
 
+var cliVersion = "dev"
+var cliCommit = "none"
+var cliDate = "unknown"
+
+// SetVersion is called from main with values injected by GoReleaser ldflags
+func SetVersion(v, c, d string) {
+	cliVersion = v
+	cliCommit = c
+	cliDate = d
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "xquare",
 	Short: "xquare PaaS CLI — manage your projects, apps, and services",
@@ -45,6 +56,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("no-input", false, "disable interactive prompts (useful in CI)")
 
 	rootCmd.AddCommand(
+		newVersionCmd(),
 		auth.NewLoginCmd(),
 		project.NewProjectCmd(),
 		app.NewAppCmd(),
@@ -97,6 +109,31 @@ func classifyError(msg string) string {
 	default:
 		return "error"
 	}
+}
+
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Run: func(cmd *cobra.Command, args []string) {
+			if isJSON, _ := cmd.Root().PersistentFlags().GetBool("json"); isJSON {
+				_ = output.JSON(map[string]string{
+					"version": cliVersion,
+					"commit":  cliCommit,
+					"date":    cliDate,
+				})
+				return
+			}
+			fmt.Printf("xquare %s (%s) built %s\n", cliVersion, cliCommit[:min(len(cliCommit), 7)], cliDate)
+		},
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // xquare link <project>
