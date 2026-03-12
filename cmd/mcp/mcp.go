@@ -62,7 +62,7 @@ func NewMCPCmd() *cobra.Command {
 			})
 
 			s.AddTool(mcp.NewTool("get_app_status",
-				mcp.WithDescription("Get deployment status (replicas, pods, hash)"),
+				mcp.WithDescription("Get deployment status (instances running, version)"),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

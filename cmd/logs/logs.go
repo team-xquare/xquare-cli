@@ -15,7 +15,7 @@ func NewLogsCmd() *cobra.Command {
 	var follow bool
 	var build bool
 	var since string
-	var workflow string
+	var buildID string
 
 	cmd := &cobra.Command{
 		Use:   "logs <app>",
@@ -30,7 +30,7 @@ func NewLogsCmd() *cobra.Command {
 			appName := args[0]
 
 			if build {
-				return streamBuildLogs(cmd, c, project, appName, workflow, follow)
+				return streamBuildLogs(cmd, c, project, appName, buildID, follow)
 			}
 			return streamRuntimeLogs(cmd, c, project, appName, tail, follow, since)
 		},
@@ -40,7 +40,7 @@ func NewLogsCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "follow log output")
 	cmd.Flags().BoolVar(&build, "build", false, "show CI build logs instead of runtime logs")
 	cmd.Flags().StringVar(&since, "since", "", "show logs since duration (e.g. 1h, 30m, 5m)")
-	cmd.Flags().StringVar(&workflow, "workflow", "latest", "specific workflow name (use with --build)")
+	cmd.Flags().StringVar(&buildID, "build-id", "latest", "specific build ID (use with --build)")
 	return cmd
 }
 
@@ -73,8 +73,8 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 	return scanner.Err()
 }
 
-func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, workflow string, follow bool) error {
-	if workflow == "latest" {
+func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildID string, follow bool) error {
+	if buildID == "latest" {
 		builds, err := c.ListBuilds(cmd.Context(), project, appName)
 		if err != nil {
 			return fmt.Errorf("list builds: %w", err)
@@ -82,13 +82,12 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, workfl
 		if len(builds) == 0 {
 			return fmt.Errorf("no builds found for %s/%s\n\nPush code or run: xquare deploy %s", project, appName, appName)
 		}
-		wfName := fmt.Sprintf("%v", builds[0]["name"])
-		wfPhase := fmt.Sprintf("%v", builds[0]["phase"])
-		output.Info(fmt.Sprintf("build: %s  [%s]", wfName, wfPhase))
-		workflow = wfName
+		buildID = fmt.Sprintf("%v", builds[0]["id"])
+		buildStatus := fmt.Sprintf("%v", builds[0]["status"])
+		output.Info(fmt.Sprintf("build: %s  [%s]", buildID, buildStatus))
 	}
 
-	resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, workflow, follow)
+	resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, buildID, follow)
 	if err != nil {
 		return fmt.Errorf("stream build logs: %w", err)
 	}

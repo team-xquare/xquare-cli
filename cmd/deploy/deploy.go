@@ -67,7 +67,7 @@ func NewDeployCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub personal access token (or set XQUARE_GITHUB_TOKEN)")
-	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "watch deployment until Running or Failed")
+	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "watch deployment progress")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
 }
@@ -90,17 +90,17 @@ func watchDeploy(cmd *cobra.Command, c *api.Client, project, app string) error {
 				continue
 			}
 			s := fmt.Sprintf("%v", status["status"])
-			ready, desired := "?", "?"
-			if rep, ok := status["replicas"].(map[string]any); ok {
-				ready = fmt.Sprintf("%v", rep["ready"])
-				desired = fmt.Sprintf("%v", rep["desired"])
+			running, desired := "?", "?"
+			if sc, ok := status["scale"].(map[string]any); ok {
+				running = fmt.Sprintf("%v", sc["running"])
+				desired = fmt.Sprintf("%v", sc["desired"])
 			}
-			output.Info(fmt.Sprintf("  → %s  (%s/%s ready)", s, ready, desired))
-			if s == "Running" {
+			output.Info(fmt.Sprintf("  → %s  (%s/%s running)", s, running, desired))
+			if s == "running" {
 				output.Success("deployment complete")
 				return nil
 			}
-			if s == "Failed" {
+			if s == "failed" {
 				return fmt.Errorf("deployment failed — run: xquare logs %s", app)
 			}
 		}

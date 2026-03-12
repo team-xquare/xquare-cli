@@ -51,8 +51,8 @@ func newDBConnectCmd() *cobra.Command {
 			}
 
 			addonType := fmt.Sprintf("%v", conn["type"])
-			tunnelHost := fmt.Sprintf("%v", conn["tunnel_host"])
-			tunnelPort := int(conn["tunnel_port"].(float64))
+			tunnelHost := fmt.Sprintf("%v", conn["host"])
+			tunnelPort := int(conn["port"].(float64))
 			password := fmt.Sprintf("%v", conn["password"])
 
 			if localPort == 0 {
@@ -110,8 +110,8 @@ func newDBTunnelCmd() *cobra.Command {
 				return fmt.Errorf("get connection info: %w", err)
 			}
 
-			tunnelHost := fmt.Sprintf("%v", conn["tunnel_host"])
-			tunnelPort := int(conn["tunnel_port"].(float64))
+			tunnelHost := fmt.Sprintf("%v", conn["host"])
+			tunnelPort := int(conn["port"].(float64))
 			password := fmt.Sprintf("%v", conn["password"])
 			addonType := fmt.Sprintf("%v", conn["type"])
 

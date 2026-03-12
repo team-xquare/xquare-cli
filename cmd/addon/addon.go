@@ -154,10 +154,8 @@ func newAddonConnectionCmd() *cobra.Command {
 			}
 			rows := [][]string{
 				{"Type", fmt.Sprintf("%v", conn["type"])},
-				{"Host (in-cluster)", fmt.Sprintf("%v", conn["host"])},
+				{"Host", fmt.Sprintf("%v", conn["host"])},
 				{"Port", fmt.Sprintf("%v", conn["port"])},
-				{"Tunnel Host", fmt.Sprintf("%v", conn["tunnel_host"])},
-				{"Tunnel Port", fmt.Sprintf("%v", conn["tunnel_port"])},
 				{"Password", fmt.Sprintf("%v", conn["password"])},
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
