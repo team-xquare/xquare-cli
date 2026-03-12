@@ -289,5 +289,5 @@ func readCache() (version string, age time.Duration) {
 }
 
 func writeCache(version string) {
-	_ = os.WriteFile(cachePath(), []byte(version), 0644)
+	_ = os.WriteFile(cachePath(), []byte(version), 0600)
 }
