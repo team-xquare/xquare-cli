@@ -2,15 +2,41 @@ package addon
 
 import (
 	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"os/signal"
 	"regexp"
+	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/output"
+	"github.com/team-xquare/xquare-cli/internal/tunnel"
 )
 
-var storageRe = regexp.MustCompile(`^\d+(Ki|Mi|Gi|Ti|Pi|E|P|T|G|M|K)$`)
+var storageRe = regexp.MustCompile(`^(\d+)(Ki|Mi|Gi|Ti|Pi|E|P|T|G|M|K)$`)
+
+const maxStorageBytes = 4 * 1024 * 1024 * 1024 // 4Gi
+
+func parseStorageBytes(s string) (int64, error) {
+	m := storageRe.FindStringSubmatch(s)
+	if m == nil {
+		return 0, fmt.Errorf("invalid storage %q: must be a number followed by a unit (e.g. 1Gi, 500Mi)", s)
+	}
+	n, _ := strconv.ParseInt(m[1], 10, 64)
+	units := map[string]int64{
+		"Ki": 1024, "Mi": 1024 * 1024, "Gi": 1024 * 1024 * 1024,
+		"Ti": 1024 * 1024 * 1024 * 1024, "Pi": 1024 * 1024 * 1024 * 1024 * 1024,
+		"K": 1000, "M": 1000 * 1000, "G": 1000 * 1000 * 1000,
+		"T": 1000 * 1000 * 1000 * 1000, "P": 1000 * 1000 * 1000 * 1000 * 1000,
+		"E": 1000 * 1000 * 1000 * 1000 * 1000 * 1000,
+	}
+	return n * units[m[2]], nil
+}
 
 func NewAddonCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -21,7 +47,9 @@ func NewAddonCmd() *cobra.Command {
 		newAddonListCmd(),
 		newAddonCreateCmd(),
 		newAddonDeleteCmd(),
-		newAddonConnectionCmd(),
+		newAddonGetCmd(),
+		newAddonConnectCmd(),
+		newAddonTunnelCmd(),
 	)
 	return cmd
 }
@@ -85,8 +113,12 @@ func newAddonCreateCmd() *cobra.Command {
 			if !validTypes[addonType] {
 				return fmt.Errorf("unsupported addon type %q\n\nSupported types: mysql, postgresql, redis, mongodb, kafka, rabbitmq, opensearch, elasticsearch, qdrant", addonType)
 			}
-			if !storageRe.MatchString(storage) {
-				return fmt.Errorf("invalid storage %q: must be a number followed by a unit (e.g. 1Gi, 500Mi, 10Gi)", storage)
+			storageBytes, err := parseStorageBytes(storage)
+			if err != nil {
+				return err
+			}
+			if storageBytes >= maxStorageBytes {
+				return fmt.Errorf("storage must be less than 4Gi (got %s)", storage)
 			}
 			project, err := api.RequireProject(cmd)
 			if err != nil {
@@ -118,7 +150,7 @@ func newAddonCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&storage, "storage", "10Gi", "storage size (e.g. 10Gi)")
+	cmd.Flags().StringVar(&storage, "storage", "2Gi", "storage size, max 4Gi (e.g. 2Gi, 500Mi)")
 	cmd.Flags().StringVar(&bootstrap, "bootstrap", "", "bootstrap SQL/script")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
@@ -155,9 +187,10 @@ func newAddonDeleteCmd() *cobra.Command {
 	return cmd
 }
 
-func newAddonConnectionCmd() *cobra.Command {
+// xquare addon get <name> — show connection info (no tunnel hints)
+func newAddonGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "connection <name>",
+		Use:   "get <name>",
 		Short: "Show connection info for an addon",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -189,17 +222,240 @@ func newAddonConnectionCmd() *cobra.Command {
 				{"Password", fmt.Sprintf("%v", conn["password"])},
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
-			// Show connection hints if host is available (even if ready=false due to server bug)
-			if host != "" && host != "<nil>" {
-				output.Info("")
-				output.Info("터널 연결:")
-				output.Info(fmt.Sprintf("  xquare db connect %s   # 인터랙티브 클라이언트 실행", addonName))
-				output.Info(fmt.Sprintf("  xquare db tunnel %s    # 로컬 포트 포워딩만 열기", addonName))
-			} else {
-				output.Info("")
-				output.Info("  xquare addon list   # 준비 상태 확인")
-			}
 			return nil
 		},
+	}
+}
+
+// xquare addon connect <name> — starts tunnel then launches native client
+func newAddonConnectCmd() *cobra.Command {
+	var localPort int
+
+	cmd := &cobra.Command{
+		Use:   "connect <name>",
+		Short: "Open an interactive session (starts tunnel automatically)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := api.FromCmd(cmd)
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			addonName := args[0]
+
+			conn, err := c.GetAddonConnection(cmd.Context(), project, addonName)
+			if err != nil {
+				return fmt.Errorf("get connection info: %w", err)
+			}
+
+			addonType := fmt.Sprintf("%v", conn["type"])
+			tunnelHost := fmt.Sprintf("%v", conn["host"])
+			portF, portOK := conn["port"].(float64)
+			if !portOK {
+				return fmt.Errorf("addon %q is not ready yet\n\n  xquare addon list   # check provisioning status", addonName)
+			}
+			tunnelPort := int(portF)
+			password := fmt.Sprintf("%v", conn["password"])
+
+			if localPort == 0 {
+				localPort = tunnelPort
+			}
+
+			wstunnelBin, tmpPath, err := resolveBinary()
+			if tmpPath != "" {
+				defer os.Remove(tmpPath)
+			}
+			if err != nil {
+				return err
+			}
+
+			output.Info(fmt.Sprintf("starting tunnel: localhost:%d → %s:%s:%d", localPort, tunnelHost, addonName, tunnelPort))
+
+			tunnelProc, err := startTunnelProc(wstunnelBin, tunnelHost, password, addonName, tunnelPort, localPort)
+			if err != nil {
+				return fmt.Errorf("start tunnel: %w", err)
+			}
+			defer tunnelProc.Kill()
+
+			if err := waitPortReady(localPort, 3*time.Second); err != nil {
+				return fmt.Errorf("tunnel did not start in time: %w", err)
+			}
+
+			output.Info(fmt.Sprintf("tunnel ready — connecting to %s...", addonType))
+			return runNativeClient(addonType, "127.0.0.1", strconv.Itoa(localPort), password, addonName)
+		},
+	}
+	cmd.Flags().IntVar(&localPort, "local-port", 0, "local port (defaults to service port)")
+	return cmd
+}
+
+// xquare addon tunnel <name> — starts wstunnel port forwarding only
+func newAddonTunnelCmd() *cobra.Command {
+	var localPort int
+	var printURL bool
+
+	cmd := &cobra.Command{
+		Use:   "tunnel <name>",
+		Short: "Open a local port tunnel to the addon",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := api.FromCmd(cmd)
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			addonName := args[0]
+
+			conn, err := c.GetAddonConnection(cmd.Context(), project, addonName)
+			if err != nil {
+				return fmt.Errorf("get connection info: %w", err)
+			}
+
+			tunnelHost := fmt.Sprintf("%v", conn["host"])
+			portF, portOK := conn["port"].(float64)
+			if !portOK {
+				return fmt.Errorf("addon %q is not ready yet\n\n  xquare addon list   # check provisioning status", addonName)
+			}
+			tunnelPort := int(portF)
+			password := fmt.Sprintf("%v", conn["password"])
+			addonType := fmt.Sprintf("%v", conn["type"])
+
+			if localPort == 0 {
+				localPort = tunnelPort
+			}
+
+			connStr := connectionString(addonType, "127.0.0.1", strconv.Itoa(localPort), password, addonName)
+
+			if printURL {
+				fmt.Println(connStr)
+				return nil
+			}
+
+			wstunnelBin, tmpPath, err := resolveBinary()
+			if tmpPath != "" {
+				defer os.Remove(tmpPath)
+			}
+			if err != nil {
+				return err
+			}
+
+			output.Info(fmt.Sprintf("tunneling localhost:%d → %s:%s:%d", localPort, tunnelHost, addonName, tunnelPort))
+			output.Info(fmt.Sprintf("connection: %s", connStr))
+			output.Info("press Ctrl+C to stop")
+
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+			localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, addonName, tunnelPort)
+			proc := exec.Command(wstunnelBin, "client",
+				"-L", localArg,
+				"--http-upgrade-path-prefix", password,
+				"--log-lvl", "OFF",
+				fmt.Sprintf("wss://%s", tunnelHost),
+			)
+			proc.Stdout = os.Stdout
+			proc.Stderr = os.Stderr
+			if err := proc.Start(); err != nil {
+				return fmt.Errorf("start wstunnel: %w", err)
+			}
+
+			go func() {
+				<-sigCh
+				output.Info("\ntunnel closed")
+				proc.Process.Kill()
+			}()
+
+			return proc.Wait()
+		},
+	}
+	cmd.Flags().IntVar(&localPort, "local-port", 0, "local port (defaults to service port)")
+	cmd.Flags().BoolVar(&printURL, "print-url", false, "print connection string only (non-interactive)")
+	return cmd
+}
+
+func resolveBinary() (binPath, tmpPath string, err error) {
+	tmp, extractErr := tunnel.ExtractWstunnel()
+	if extractErr == nil {
+		return tmp, tmp, nil
+	}
+	sys, sysErr := exec.LookPath("wstunnel")
+	if sysErr == nil {
+		return sys, "", nil
+	}
+	return "", "", fmt.Errorf("wstunnel not available: %v", extractErr)
+}
+
+func startTunnelProc(bin, tunnelHost, password, serviceName string, servicePort, localPort int) (*os.Process, error) {
+	localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, serviceName, servicePort)
+	cmd := exec.Command(bin, "client",
+		"-L", localArg,
+		"--http-upgrade-path-prefix", password,
+		"--log-lvl", "OFF",
+		fmt.Sprintf("wss://%s", tunnelHost),
+	)
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	return cmd.Process, nil
+}
+
+func waitPortReady(port int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 200*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("port %d not ready after %s", port, timeout)
+}
+
+func runNativeClient(addonType, host, port, password, dbName string) error {
+	var args []string
+	var bin string
+
+	switch addonType {
+	case "mysql":
+		bin = "mysql"
+		args = []string{"-h", host, "-P", port, "-u", "root", "-p" + password, dbName}
+	case "postgresql":
+		bin = "psql"
+		args = []string{fmt.Sprintf("postgresql://postgres:%s@%s:%s/%s", password, host, port, dbName)}
+	case "redis":
+		bin = "redis-cli"
+		args = []string{"-h", host, "-p", port, "-a", password}
+	case "mongodb":
+		bin = "mongosh"
+		args = []string{fmt.Sprintf("mongodb://root:%s@%s:%s/%s", password, host, port, dbName)}
+	default:
+		return fmt.Errorf("no native client support for %s\nUse 'xquare addon tunnel --print-url'", addonType)
+	}
+
+	if _, err := exec.LookPath(bin); err != nil {
+		return fmt.Errorf("%s not found in PATH\nConnection: %s",
+			bin, connectionString(addonType, host, port, password, dbName))
+	}
+
+	c := exec.Command(bin, args...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
+}
+
+func connectionString(addonType, host, port, password, dbName string) string {
+	switch addonType {
+	case "mysql":
+		return fmt.Sprintf("mysql://root:%s@%s:%s/%s", password, host, port, dbName)
+	case "postgresql":
+		return fmt.Sprintf("postgresql://postgres:%s@%s:%s/%s", password, host, port, dbName)
+	case "redis":
+		return fmt.Sprintf("redis://:%s@%s:%s", password, host, port)
+	case "mongodb":
+		return fmt.Sprintf("mongodb://root:%s@%s:%s/%s", password, host, port, dbName)
+	default:
+		return fmt.Sprintf("%s://root:%s@%s:%s/%s", addonType, password, host, port, dbName)
 	}
 }

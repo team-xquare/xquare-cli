@@ -2,12 +2,22 @@ package project
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/spf13/cobra"
 
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
+
+var projectNameRe = regexp.MustCompile(`^[a-z0-9]{2,63}$`)
+
+func validateProjectName(name string) error {
+	if !projectNameRe.MatchString(name) {
+		return fmt.Errorf("invalid project name %q: lowercase letters and numbers only, no hyphens (2-63 chars)", name)
+	}
+	return nil
+}
 
 func NewProjectCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -116,6 +126,9 @@ func newCreateCmd() *cobra.Command {
 		Short: "Create a new project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateProjectName(args[0]); err != nil {
+				return err
+			}
 			if dryRun {
 				output.Info(fmt.Sprintf("[dry-run] would create project: %s", args[0]))
 				return nil

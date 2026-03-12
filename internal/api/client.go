@@ -282,6 +282,11 @@ func (c *Client) GetAddonConnection(ctx context.Context, project, addon string) 
 	return out, c.get(ctx, "/projects/"+project+"/addons/"+addon+"/connection", &out)
 }
 
+func (c *Client) GetAppTunnel(ctx context.Context, project, app string) (map[string]any, error) {
+	var out map[string]any
+	return out, c.get(ctx, "/projects/"+project+"/apps/"+app+"/tunnel", &out)
+}
+
 // Logs — returns the raw response for streaming
 func (c *Client) StreamLogs(ctx context.Context, project, app string, tail int64, follow bool, since string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/projects/%s/apps/%s/logs?tail=%d", c.base, project, app, tail)
