@@ -713,7 +713,11 @@ BEFORE calling this tool you MUST:
 			})
 
 			s.AddTool(mcp.NewTool("get_build_logs",
-				mcp.WithDescription("Get CI/CD build logs for a specific build. Use list_builds to get build IDs, or omit build_id to get the latest build logs."),
+				mcp.WithDescription(`Get CI/CD build logs for a specific build.
+
+⚠️  If build was just triggered (< 30s ago), the pod may still be initializing.
+If you get status "initializing", wait 20-30 seconds and call again — do NOT retry immediately in a loop.
+Use list_builds to get build IDs, or omit build_id to get the latest build logs.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 				mcp.WithString("build_id", mcp.Description("Build workflow ID (e.g. my-app-ci-abc12). Omit for latest build.")),
