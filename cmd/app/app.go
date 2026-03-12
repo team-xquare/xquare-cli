@@ -229,18 +229,19 @@ func newStatusCmd() *cobra.Command {
 				instancesDisplay = "-"
 			}
 
+			ciReadyStr := "✓ ready"
+			if !ciReady {
+				ciReadyStr = "⏳ preparing..."
+			}
 			rows := [][]string{
 				{"Status", statusDisplay},
+				{"CI Ready", ciReadyStr},
 				{"Instances", instancesDisplay},
 				{"Version", version},
 			}
 
-			if appStatus == "not_deployed" {
-				if !ciReady {
-					rows = append(rows, []string{"Hint", "CI pipeline preparing... try xquare trigger in a minute"})
-				} else {
-					rows = append(rows, []string{"Hint", fmt.Sprintf("run: xquare trigger %s --watch", args[0])})
-				}
+			if appStatus == "not_deployed" && !ciReady {
+				rows = append(rows, []string{"Hint", "CI/CD pipeline initializing, please wait (~2-3 min)"})
 			}
 
 			if lb, ok := status["lastBuild"].(map[string]any); ok && lb != nil {
@@ -264,6 +265,7 @@ func newStatusCmd() *cobra.Command {
 
 func newCreateCmd() *cobra.Command {
 	var dryRun bool
+	var wait bool
 	cmd := &cobra.Command{
 		Use:   "create <app>",
 		Short: "Create a new application",
@@ -294,8 +296,16 @@ func newCreateCmd() *cobra.Command {
 				return fmt.Errorf("invalid --build-type %q\n\nSupported types: gradle, nodejs, react, vite, vue, nextjs, nextjs-export, go, rust, maven, django, flask, docker", buildType)
 			}
 
-			// Auto-detect owner/repo from git remote if not specified
+			// Auto-detect owner/repo from git remote if not specified.
+			// If --repo contains a slash (e.g. "team-xquare/my-repo"), split it.
 			ownerChanged := cmd.Flags().Changed("owner")
+			if strings.Contains(repo, "/") {
+				parts := strings.SplitN(repo, "/", 2)
+				if !ownerChanged {
+					owner = parts[0]
+				}
+				repo = parts[1]
+			}
 			autoDetected := false
 			if repo == "" || !ownerChanged {
 				detectedOwner, detectedRepo := detectGitOrigin()
@@ -304,7 +314,7 @@ func newCreateCmd() *cobra.Command {
 						repo = detectedRepo
 						autoDetected = true
 					} else {
-						return fmt.Errorf("--repo is required (e.g. --repo my-repo-name)\n\n  xquare app create %s --repo <github-repo-name>", appName)
+						return fmt.Errorf("--repo is required (e.g. --repo my-repo or --repo owner/my-repo)\n\n  xquare app create %s --repo <github-repo-name>", appName)
 					}
 				}
 				if !ownerChanged && detectedOwner != "" {
@@ -342,10 +352,20 @@ func newCreateCmd() *cobra.Command {
 				return output.JSON(result)
 			}
 			output.Success(fmt.Sprintf("created app %s in project %s", appName, project))
+
+			if wait {
+				output.Info("CI/CD 파이프라인 준비 중... (Ctrl+C to cancel)")
+				if err := waitCIReady(cmd, api.FromCmd(cmd), project, appName); err != nil {
+					return err
+				}
+				output.Success("CI/CD 준비 완료 — git push 하면 자동 배포됩니다")
+				return nil
+			}
+
 			output.Info("")
 			output.Info("CI/CD 파이프라인 준비 중... (약 2~3분 소요)")
-			output.Info("준비 완료 후:")
-			output.Info(fmt.Sprintf("  xquare trigger %s --watch        # 첫 배포 시작 + 완료까지 대기", appName))
+			output.Info("준비 완료 후: git push하면 자동 배포됩니다")
+			output.Info(fmt.Sprintf("  xquare app status %s            # 준비 상태 확인", appName))
 			output.Info(fmt.Sprintf("  xquare env set %s KEY=value     # 환경변수 설정", appName))
 			return nil
 		},
@@ -369,7 +389,31 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().String("dockerfile", "./Dockerfile", "Dockerfile path")
 	cmd.Flags().String("context", ".", "Docker build context")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen without creating")
+	cmd.Flags().BoolVar(&wait, "wait", false, "wait until CI/CD pipeline is ready (~2-3 min)")
 	return cmd
+}
+
+// waitCIReady polls app status until ciReady=true, up to 5 minutes.
+func waitCIReady(cmd *cobra.Command, c *api.Client, project, app string) error {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	timeout := time.After(5 * time.Minute)
+	for {
+		select {
+		case <-cmd.Context().Done():
+			return nil
+		case <-timeout:
+			return fmt.Errorf("timeout: CI/CD pipeline not ready after 5 minutes\n\n  xquare app status %s   # check status", app)
+		case <-ticker.C:
+			status, err := c.GetAppStatus(cmd.Context(), project, app)
+			if err != nil {
+				continue
+			}
+			if fmt.Sprintf("%v", status["ciReady"]) == "true" {
+				return nil
+			}
+		}
+	}
 }
 
 func newUpdateCmd() *cobra.Command {

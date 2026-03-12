@@ -218,9 +218,10 @@ func newAddonGetCmd() *cobra.Command {
 			rows := [][]string{
 				{"Status", readyStr},
 				{"Type", addonType},
-				{"Host", host},
+				{"In-Cluster Host", addonName},
+				{"External Host", host},
 				{"Port", fmt.Sprintf("%v", conn["port"])},
-				{"Password", fmt.Sprintf("%v", conn["password"])},
+				{"Tunnel Key", fmt.Sprintf("%v", conn["password"])},
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
 			return nil

@@ -68,7 +68,18 @@ func newListCmd() *cobra.Command {
 			}
 			output.Table([]string{"NAME"}, rows)
 			if current != "" {
-				output.Info(fmt.Sprintf("(* = current project: %s)", current))
+				found := false
+				for _, p := range projects {
+					if p == current {
+						found = true
+						break
+					}
+				}
+				if found {
+					output.Info(fmt.Sprintf("(* = linked project: %s)", current))
+				} else {
+					output.Warn(fmt.Sprintf("linked project %q not found or no access — run: xquare link <project>", current))
+				}
 			}
 			return nil
 		},

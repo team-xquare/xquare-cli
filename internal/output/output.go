@@ -87,6 +87,11 @@ func Info(msg string) {
 	fmt.Fprintln(os.Stderr, msg)
 }
 
+// Warn prints a warning message to stderr
+func Warn(msg string) {
+	fmt.Fprintln(os.Stderr, "⚠  "+msg)
+}
+
 // Err prints an error to stderr with formatting
 func Err(what, why string, next ...string) {
 	fmt.Fprintf(os.Stderr, "Error: %s\n", what)
