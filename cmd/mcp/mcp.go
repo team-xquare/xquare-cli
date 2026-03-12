@@ -510,7 +510,7 @@ BEFORE calling this tool you MUST:
 			})
 
 			s.AddTool(mcp.NewTool("get_addon_status",
-				mcp.WithDescription("Get status and connection info for an addon (ready, host, port, password). The password is the wstunnel access key for tunneling. NOTE: from inside the cluster (another app in the same project), use the addon name directly as hostname — e.g. DB_HOST=mydb, not the external host."),
+				mcp.WithDescription("Get status and connection info for an addon. NOTE: from inside the cluster (another app in the same project), use the addon name directly as hostname — e.g. DB_HOST=mydb. For local tunneling use 'xquare addon tunnel' CLI command."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("addon", mcp.Required(), mcp.Description("Addon name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -523,7 +523,18 @@ BEFORE calling this tool you MUST:
 					return mcp.NewToolResultError(err.Error()), nil
 				}
 				data, err := client.GetAddonConnection(ctx, project, addon)
-				return jsonResult(data, err)
+				if err != nil {
+					return jsonResult(nil, err)
+				}
+				// Strip internal tunnel credentials from MCP response
+				safe := map[string]any{
+					"name":  addon,
+					"type":  data["type"],
+					"ready": data["ready"],
+					"port":  data["port"],
+					"note":  fmt.Sprintf("In-cluster host: %s (use as DB_HOST inside your app)", addon),
+				}
+				return jsonResult(safe, nil)
 			})
 
 			// ── Deploy & logs ─────────────────────────────────────────────
