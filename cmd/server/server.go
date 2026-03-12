@@ -10,6 +10,15 @@ import (
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
 
+func coalesce(vals ...any) any {
+	for _, v := range vals {
+		if v != nil {
+			return v
+		}
+	}
+	return nil
+}
+
 func NewServerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
@@ -51,8 +60,9 @@ func newAllowlistListCmd() *cobra.Command {
 			}
 			rows := make([][]string, 0, len(users))
 			for _, u := range users {
-				id := fmt.Sprintf("%v", u["id"])
-				username := fmt.Sprintf("%v", u["username"])
+				// handle both lowercase (json tagged) and capitalized (untagged) field names
+				id := fmt.Sprintf("%v", coalesce(u["id"], u["ID"]))
+				username := fmt.Sprintf("%v", coalesce(u["username"], u["Username"]))
 				rows = append(rows, []string{username, id})
 			}
 			output.Table([]string{"Username", "GitHub ID"}, rows)
