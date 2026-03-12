@@ -154,7 +154,7 @@ CONSTRAINTS:
 - endpoints format: ["8080"] or ["8080:api.dsmhs.kr"] or ["8080:api.dsmhs.kr,admin.dsmhs.kr"] (repeatable for multiple ports)
 - GitHub App must be installed on the repo (error will include install URL if not)
 
-After creation, CI pipeline takes ~2-3 minutes to prepare. Then call deploy tool.`),
+After creation, CI pipeline takes ~2-3 minutes to prepare. Then call trigger tool.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name: lowercase, hyphens ok, 2-63 chars")),
 				mcp.WithString("build_type", mcp.Required(), mcp.Description("gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),
@@ -498,7 +498,7 @@ CONSTRAINTS:
 
 			// ── Deploy & logs ─────────────────────────────────────────────
 
-			s.AddTool(mcp.NewTool("deploy",
+			s.AddTool(mcp.NewTool("trigger",
 				mcp.WithDescription("Trigger re-deploy with the latest commit. CI pipeline must be ready (ciReady=true in get_app_status). Returns build workflow name."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
