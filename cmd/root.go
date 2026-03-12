@@ -10,6 +10,7 @@ import (
 	"github.com/team-xquare/xquare-cli/cmd/app"
 	"github.com/team-xquare/xquare-cli/cmd/auth"
 	"github.com/team-xquare/xquare-cli/cmd/deploy"
+	"github.com/team-xquare/xquare-cli/cmd/schema"
 	"github.com/team-xquare/xquare-cli/cmd/env"
 	"github.com/team-xquare/xquare-cli/cmd/logs"
 	"github.com/team-xquare/xquare-cli/cmd/mcp"
@@ -46,6 +47,7 @@ func init() {
 		addon.NewAddonCmd(),
 		logs.NewLogsCmd(),
 		mcp.NewMCPCmd(),
+		schema.NewSchemaCmd(),
 		newLinkCmd(),
 		newUnlinkCmd(),
 		newWhoamiCmd(),
