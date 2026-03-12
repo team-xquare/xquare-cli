@@ -164,7 +164,7 @@ CONSTRAINTS:
 - endpoints format: ["8080"] or ["8080:api.dsmhs.kr"] or ["8080:api.dsmhs.kr,admin.dsmhs.kr"] (repeatable for multiple ports)
 - GitHub App must be installed on the repo (error will include install URL if not)
 
-After creation, CI pipeline takes ~2-3 minutes to prepare. Then call trigger tool.`),
+After creation, CI pipeline takes ~2-3 minutes to initialize. Once ready, CI/CD will run automatically on every git push — you do NOT need to call the trigger tool. Use trigger only if the automatic webhook fails.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name: lowercase, hyphens ok, 2-63 chars")),
 				mcp.WithString("build_type", mcp.Required(), mcp.Description("gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),
