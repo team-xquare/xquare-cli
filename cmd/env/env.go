@@ -88,7 +88,14 @@ func newEnvSetCmd() *cobra.Command {
 				if len(parts) != 2 {
 					return fmt.Errorf("invalid KEY=VALUE format: %s", kv)
 				}
-				envs[parts[0]] = parts[1]
+				key := parts[0]
+				if key == "" {
+					return fmt.Errorf("invalid KEY=VALUE format: key cannot be empty")
+				}
+				if strings.ContainsAny(key, " \t") {
+					return fmt.Errorf("invalid key %q: keys cannot contain spaces or tabs", key)
+				}
+				envs[key] = parts[1]
 			}
 
 			if dryRun {

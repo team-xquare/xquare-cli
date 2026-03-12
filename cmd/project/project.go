@@ -43,11 +43,23 @@ func newListCmd() *cobra.Command {
 				output.Info("no projects found")
 				return nil
 			}
+			// Load current linked project for highlighting
+			current := ""
+			if pc, _ := api.GetCurrentProject(cmd); pc != "" {
+				current = pc
+			}
 			rows := make([][]string, len(projects))
 			for i, p := range projects {
-				rows[i] = []string{p}
+				name := p
+				if p == current {
+					name = "* " + p
+				}
+				rows[i] = []string{name}
 			}
 			output.Table([]string{"NAME"}, rows)
+			if current != "" {
+				output.Info(fmt.Sprintf("(* = current project: %s)", current))
+			}
 			return nil
 		},
 	}
