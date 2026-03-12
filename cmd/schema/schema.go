@@ -92,16 +92,16 @@ func buildSchema() map[string]any {
 			envSchema(),
 			addonSchema(),
 			{
-				Command:     "deploy <app>",
-				Description: "Trigger re-deploy with the latest commit. Use --watch to wait until deployment completes.",
+				Command:     "trigger <app>",
+				Description: "Manually trigger CI/CD for the latest commit. Use --watch to wait until deployment completes.",
 				Args:        []ArgSchema{{Name: "app", Required: true}},
 				Flags: []FlagSchema{
 					{Name: "watch", Type: "bool", Desc: "wait until deployment is fully running"},
 					{Name: "dry-run", Type: "bool", Desc: "show what would happen"},
 				},
 				Examples: []string{
-					"xquare deploy my-api",
-					"xquare deploy my-api --watch",
+					"xquare trigger my-api",
+					"xquare trigger my-api --watch",
 				},
 			},
 			{
