@@ -277,8 +277,29 @@ func newUpdateCmd() *cobra.Command {
 				body["build"] = buildBody(buildType, cmd)
 			}
 			if cmd.Flags().Changed("port") || cmd.Flags().Changed("routes") {
-				port, _ := cmd.Flags().GetInt("port")
-				routes, _ := cmd.Flags().GetStringSlice("routes")
+				// start from existing endpoint
+				existingPort := 8080
+				existingRoutes := []string{}
+				if eps, ok := existing["endpoints"].([]any); ok && len(eps) > 0 {
+					if ep, ok := eps[0].(map[string]any); ok {
+						if p, ok := ep["port"].(float64); ok {
+							existingPort = int(p)
+						}
+						if r, ok := ep["routes"].([]any); ok {
+							for _, route := range r {
+								existingRoutes = append(existingRoutes, fmt.Sprintf("%v", route))
+							}
+						}
+					}
+				}
+				port := existingPort
+				routes := existingRoutes
+				if cmd.Flags().Changed("port") {
+					port, _ = cmd.Flags().GetInt("port")
+				}
+				if cmd.Flags().Changed("routes") {
+					routes, _ = cmd.Flags().GetStringSlice("routes")
+				}
 				body["endpoints"] = []map[string]any{{"port": port, "routes": routes}}
 			}
 			if dryRun {
