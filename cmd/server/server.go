@@ -92,7 +92,14 @@ func newAllowlistAddCmd() *cobra.Command {
 			if api.IsJSON(cmd) {
 				return output.JSON(result)
 			}
-			output.Success(fmt.Sprintf("added %s (id=%v) to allowlist", result["username"], result["id"]))
+			var id string
+			switch v := result["id"].(type) {
+			case float64:
+				id = fmt.Sprintf("%d", int64(v))
+			default:
+				id = fmt.Sprintf("%v", v)
+			}
+			output.Success(fmt.Sprintf("added %s (id=%s) to allowlist", result["username"], id))
 			return nil
 		},
 	}
