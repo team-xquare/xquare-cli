@@ -166,9 +166,9 @@ CONSTRAINTS:
 
 DEPLOYMENT FLOW after create_app:
 1. Wait ~2-3 minutes for CI infrastructure to initialize (ciReady=true in get_app_status)
-2. If code was already pushed to GitHub BEFORE creating this xquare app: call trigger ONCE to kick off the initial build
-3. If code will be pushed AFTER creating this app: just git push — CI runs automatically, do NOT call trigger
-4. For ALL subsequent deployments: git push triggers CI automatically — NEVER call trigger after a git push`),
+2. If code is already on GitHub (was pushed before this app was created): call trigger ONCE — the webhook missed the commit
+3. If code will be pushed after this step: just git push — CI runs automatically, do NOT call trigger
+4. For ALL subsequent deployments: git push → CI runs automatically — ⛔ NEVER call trigger after a git push`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name: lowercase, hyphens ok, 2-63 chars")),
 				mcp.WithString("build_type", mcp.Required(), mcp.Description("gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),

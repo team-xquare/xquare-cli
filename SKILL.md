@@ -53,31 +53,22 @@ xquare schema
 
 ### Deploy a new app
 
-**Case A — Code pushed AFTER app creation (recommended)**
 ```bash
-# 1. Create the xquare app first
+# 1. Create the xquare app
 xquare app create my-api --build-type go --endpoint 8080:api.dsmhs.kr \
   --owner my-org --repo my-repo --branch main
 
 # 2. Wait ~2-3 minutes for CI infrastructure (check: xquare app status my-api)
-# 3. Push code → CI/CD triggers AUTOMATICALLY, do NOT call trigger
+
+# 3a. If code will be pushed now → just git push, CI runs automatically
 git push origin main
+
+# 3b. If code was ALREADY on GitHub before step 1 → call trigger ONCE (webhook missed it)
+xquare trigger my-api
 
 # 4. Watch progress
 xquare logs my-api --build
 xquare app status my-api
-```
-
-**Case B — Code was ALREADY on GitHub before app creation**
-```bash
-# 1. Create the xquare app
-xquare app create my-api ...
-
-# 2. Wait for CI infrastructure to be ready (ciReady=true)
-# 3. Call trigger ONCE — because the webhook missed the existing commit
-xquare trigger my-api
-
-# 4. For ALL future deployments: just git push, never call trigger again
 ```
 
 ⛔ **NEVER call trigger after a git push** — webhook handles it automatically.
