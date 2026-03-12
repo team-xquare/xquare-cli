@@ -164,7 +164,11 @@ CONSTRAINTS:
 - endpoints format: ["8080"] or ["8080:api.dsmhs.kr"] or ["8080:api.dsmhs.kr,admin.dsmhs.kr"] (repeatable for multiple ports)
 - GitHub App must be installed on the repo (error will include install URL if not)
 
-After creation, CI pipeline takes ~2-3 minutes to initialize. Once ready, CI/CD will run automatically on every git push — you do NOT need to call the trigger tool. Use trigger only if the automatic webhook fails.`),
+DEPLOYMENT FLOW after create_app:
+1. Wait ~2-3 minutes for CI infrastructure to initialize (ciReady=true in get_app_status)
+2. If code was already pushed to GitHub BEFORE creating this xquare app: call trigger ONCE to kick off the initial build
+3. If code will be pushed AFTER creating this app: just git push — CI runs automatically, do NOT call trigger
+4. For ALL subsequent deployments: git push triggers CI automatically — NEVER call trigger after a git push`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name: lowercase, hyphens ok, 2-63 chars")),
 				mcp.WithString("build_type", mcp.Required(), mcp.Description("gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),
@@ -510,17 +514,13 @@ BEFORE calling this tool you MUST:
 			})
 
 			s.AddTool(mcp.NewTool("get_addon_status",
-				mcp.WithDescription(`Get status and connection info for an addon.
+				mcp.WithDescription(`Get status and connection info for an addon. Returns ready-to-use env var values.
 
-IMPORTANT — no password required: xquare addons have NO password. Connect without any credentials.
-- DB_HOST = addon name (e.g. "db")
-- DB_PORT = port from this response
-- DB_USER = "postgres" (postgresql) / "root" (mysql) / no auth (redis, mongodb)
-- DB_PASSWORD = leave empty / omit entirely
-- DB_NAME = same as addon name
+⚠️  CRITICAL — xquare addons have NO PASSWORD. Never ask the user for a DB password. Never look for one.
+The response includes all env vars you need. Just use them as-is.
 
-Example env vars for a postgresql addon named "db":
-  DB_HOST=db  DB_PORT=5432  DB_USER=postgres  DB_NAME=db  (no password)
+Response fields are ready-to-use:
+  db_host, db_port, db_user, db_password (always empty), db_name
 
 For local tunneling use 'xquare addon tunnel' CLI command.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
@@ -550,16 +550,16 @@ For local tunneling use 'xquare addon tunnel' CLI command.`),
 					defaultUser = "(no auth)"
 				}
 				safe := map[string]any{
-					"name":         addon,
-					"type":         addonType,
-					"ready":        data["ready"],
-					"port":         data["port"],
-					"db_host":      addon,
-					"db_port":      data["port"],
-					"db_user":      defaultUser,
-					"db_password":  "(none — no password required)",
-					"db_name":      addon,
-					"note":         "No password needed. Connect directly using the addon name as hostname inside your app.",
+					"name":        addon,
+					"type":        addonType,
+					"ready":       data["ready"],
+					"port":        data["port"],
+					"db_host":     addon,
+					"db_port":     data["port"],
+					"db_user":     defaultUser,
+					"db_password": "(none — no password required)",
+					"db_name":     addon,
+					"note":        "No password needed. Connect directly using the addon name as hostname inside your app.",
 				}
 				return jsonResult(safe, nil)
 			})
@@ -567,7 +567,19 @@ For local tunneling use 'xquare addon tunnel' CLI command.`),
 			// ── Deploy & logs ─────────────────────────────────────────────
 
 			s.AddTool(mcp.NewTool("trigger",
-				mcp.WithDescription("Force re-run CI/CD with the latest commit. NOTE: CI/CD runs automatically on git push — only use this when the automatic webhook failed or you need to re-deploy without a code change. CI pipeline must be ready (ciReady=true in get_app_status). Returns build workflow name."),
+				mcp.WithDescription(`Force re-run CI/CD with the latest commit.
+
+⚠️  WHEN TO USE trigger (ONLY these cases):
+1. App was just created AND code was already on GitHub before app creation (initial build only)
+2. The automatic webhook failed (you pushed but nothing happened after 5+ minutes)
+3. You need to re-deploy without making a code change
+
+⛔  DO NOT use trigger:
+- After a git push (CI runs automatically — webhook handles it)
+- Just because you want to "start a build" after pushing
+- Repeatedly to check if build works (push once, wait, check logs)
+
+CI pipeline must be ready (ciReady=true in get_app_status) before calling trigger.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
