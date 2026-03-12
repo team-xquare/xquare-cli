@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -18,6 +19,13 @@ type Client struct {
 }
 
 func New(base, token string) *Client {
+	// Reject non-HTTPS server URLs to prevent credential theft via plaintext transport.
+	// Allow http:// only for localhost/127.0.0.1 (local dev).
+	if u, err := url.Parse(base); err == nil {
+		if u.Scheme == "http" && u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" {
+			fmt.Fprintf(os.Stderr, "warn: server URL %q uses plain HTTP — credentials will be sent unencrypted\n", base)
+		}
+	}
 	return &Client{
 		base:  base,
 		token: token,

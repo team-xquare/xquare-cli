@@ -121,6 +121,12 @@ func Upgrade(currentVersion string) error {
 	if downloadURL == "" {
 		return fmt.Errorf("no binary found for %s/%s in release %s (expected %s)", runtime.GOOS, runtime.GOARCH, rel.TagName, assetName)
 	}
+	// Verify the download URL originates from the official GitHub release path
+	// to prevent binary replacement attacks if the API response is tampered with.
+	const allowedURLPrefix = "https://github.com/team-xquare/xquare-cli/releases/download/"
+	if !strings.HasPrefix(downloadURL, allowedURLPrefix) {
+		return fmt.Errorf("download URL %q is not from the official release path — upgrade aborted", downloadURL)
+	}
 
 	fmt.Fprintf(os.Stderr, "Downloading %s...\n", rel.TagName)
 	binData, err := downloadAndExtract(downloadURL, assetName)
