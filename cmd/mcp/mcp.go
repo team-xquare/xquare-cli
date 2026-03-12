@@ -552,6 +552,134 @@ CONSTRAINTS:
 				return mcp.NewToolResultText(strings.Join(lines, "\n")), nil
 			})
 
+			// ── Members ───────────────────────────────────────────────────
+
+			s.AddTool(mcp.NewTool("list_members",
+				mcp.WithDescription("List members (owners) of a project."),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				data, err := client.ListMembers(ctx, project)
+				return jsonResult(data, err)
+			})
+
+			s.AddTool(mcp.NewTool("add_member",
+				mcp.WithDescription("Add a GitHub user as a project member by their GitHub username."),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("username", mcp.Required(), mcp.Description("GitHub username to add")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				username, err := req.RequireString("username")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				if err := client.AddMember(ctx, project, username); err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				return mcp.NewToolResultText(fmt.Sprintf("added %q to project %q", username, project)), nil
+			})
+
+			s.AddTool(mcp.NewTool("remove_member",
+				mcp.WithDescription("Remove a member from a project by their GitHub username."),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("username", mcp.Required(), mcp.Description("GitHub username to remove")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				username, err := req.RequireString("username")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				if err := client.RemoveMember(ctx, project, username); err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				return mcp.NewToolResultText(fmt.Sprintf("removed %q from project %q", username, project)), nil
+			})
+
+			// ── Build tools ───────────────────────────────────────────────
+
+			s.AddTool(mcp.NewTool("list_builds",
+				mcp.WithDescription("List recent CI/CD build history for an app. Returns build ID, status (running/success/failed), and timestamps."),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				app, err := req.RequireString("app")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				data, err := client.ListBuilds(ctx, project, app)
+				return jsonResult(data, err)
+			})
+
+			s.AddTool(mcp.NewTool("get_build_logs",
+				mcp.WithDescription("Get CI/CD build logs for a specific build. Use list_builds to get build IDs, or omit build_id to get the latest build logs."),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
+				mcp.WithString("build_id", mcp.Description("Build workflow ID (e.g. my-app-ci-abc12). Omit for latest build.")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				appName, err := req.RequireString("app")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				buildID := req.GetString("build_id", "")
+				if buildID == "" {
+					builds, err := client.ListBuilds(ctx, project, appName)
+					if err != nil {
+						return mcp.NewToolResultError(err.Error()), nil
+					}
+					if len(builds) == 0 {
+						return mcp.NewToolResultError("no builds found"), nil
+					}
+					buildID = fmt.Sprintf("%v", builds[0]["id"])
+				}
+				resp, err := client.StreamBuildLogs(ctx, project, appName, buildID, false)
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				defer resp.Body.Close()
+				if resp.StatusCode >= 400 {
+					b, _ := io.ReadAll(resp.Body)
+					return mcp.NewToolResultError(fmt.Sprintf("server error %d: %s", resp.StatusCode, string(b))), nil
+				}
+				var lines []string
+				scanner := bufio.NewScanner(resp.Body)
+				for scanner.Scan() {
+					lines = append(lines, scanner.Text())
+				}
+				return mcp.NewToolResultText(strings.Join(lines, "\n")), nil
+			})
+
+			// ── Meta ──────────────────────────────────────────────────────
+
+			s.AddTool(mcp.NewTool("whoami",
+				mcp.WithDescription("Get the currently authenticated user information (username, server URL)."),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				cfg, err := config.LoadGlobal()
+				if err != nil || cfg.Token == "" {
+					return mcp.NewToolResultError("not logged in"), nil
+				}
+				return jsonResult(map[string]string{
+					"username": cfg.Username,
+					"server":   cfg.ServerURL,
+				}, nil)
+			})
+
 			s.AddTool(mcp.NewTool("schema",
 				mcp.WithDescription("Return the full xquare CLI command schema with all constraints, valid values, and examples. Call this first to understand all available commands before doing anything else."),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
