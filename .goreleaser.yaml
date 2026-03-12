@@ -37,7 +37,7 @@ archives:
       - SKILL.md
 
 brews:
-  - name: xquare
+  - name: xquare-cli
     repository:
       owner: team-xquare
       name: homebrew-xquare

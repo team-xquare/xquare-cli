@@ -319,7 +319,7 @@ Note: github_owner and github_repo cannot be changed after creation.`),
 				return jsonResult(data, err)
 			})
 
-		s.AddTool(mcp.NewTool("delete_app",
+			s.AddTool(mcp.NewTool("delete_app",
 				mcp.WithDescription("Delete an application. Irreversible — also removes Vault secrets."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),

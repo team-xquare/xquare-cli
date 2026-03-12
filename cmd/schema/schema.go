@@ -61,13 +61,13 @@ func buildSchema() map[string]any {
 			{Name: "fields", Type: "string", Desc: "comma-separated fields to include in JSON output"},
 		},
 		"constraints": map[string]string{
-			"project_name": "lowercase letters and numbers only, no hyphens, 2-63 chars. Example: myproject, dsm2025",
-			"app_name":     "lowercase letters, numbers, hyphens allowed, 2-63 chars, cannot start/end with hyphen. Example: my-api, backend",
-			"addon_name":   "same rules as app_name",
-			"storage":      "number + unit, must be less than 4Gi. Examples: 1Gi, 500Mi, 2Gi. Default: 2Gi",
-			"build_type":   "gradle | nodejs | react | vite | vue | nextjs | nextjs-export | go | rust | maven | django | flask | docker",
-			"addon_type":   "mysql | postgresql | redis | mongodb | kafka | rabbitmq | opensearch | elasticsearch | qdrant",
-			"endpoint":     "<port> or <port>:<domain1>,<domain2>. Example: 8080 or 8080:api.dsmhs.kr or 8080:api.dsmhs.kr,admin.dsmhs.kr",
+			"project_name":  "lowercase letters and numbers only, no hyphens, 2-63 chars. Example: myproject, dsm2025",
+			"app_name":      "lowercase letters, numbers, hyphens allowed, 2-63 chars, cannot start/end with hyphen. Example: my-api, backend",
+			"addon_name":    "same rules as app_name",
+			"storage":       "number + unit, must be less than 4Gi. Examples: 1Gi, 500Mi, 2Gi. Default: 2Gi",
+			"build_type":    "gradle | nodejs | react | vite | vue | nextjs | nextjs-export | go | rust | maven | django | flask | docker",
+			"addon_type":    "mysql | postgresql | redis | mongodb | kafka | rabbitmq | opensearch | elasticsearch | qdrant",
+			"endpoint":      "<port> or <port>:<domain1>,<domain2>. Example: 8080 or 8080:api.dsmhs.kr or 8080:api.dsmhs.kr,admin.dsmhs.kr",
 			"trigger_paths": "comma-separated glob patterns for CI trigger filtering. Example: src/**,Dockerfile,go.mod",
 		},
 		"commands": []CommandSchema{
@@ -423,4 +423,3 @@ func addonSchema() CommandSchema {
 		},
 	}
 }
-
