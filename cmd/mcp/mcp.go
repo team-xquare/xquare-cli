@@ -84,9 +84,19 @@ in your AI tool instead of starting the server directly.`,
 			})
 
 			s.AddTool(mcp.NewTool("delete_project",
-				mcp.WithDescription("Delete a project and ALL its apps and addons. Irreversible."),
+				mcp.WithDescription(`⚠️  DESTRUCTIVE — IRREVERSIBLE. Deletes a project AND ALL its apps, addons, environment variables, and persistent storage forever.
+
+BEFORE calling this tool you MUST:
+1. Tell the user exactly what will be deleted
+2. Ask the user to explicitly confirm with "yes"
+3. Only proceed after receiving clear confirmation
+4. Set confirm="yes" to execute`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name to delete")),
+				mcp.WithString("confirm", mcp.Required(), mcp.Description(`Must be exactly "yes" — only set this after the user has explicitly confirmed deletion`)),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				if req.GetString("confirm", "") != "yes" {
+					return mcp.NewToolResultError("deletion cancelled: confirm must be \"yes\". Ask the user to explicitly confirm before proceeding."), nil
+				}
 				project, err := req.RequireString("project")
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
@@ -320,10 +330,20 @@ Note: github_owner and github_repo cannot be changed after creation.`),
 			})
 
 			s.AddTool(mcp.NewTool("delete_app",
-				mcp.WithDescription("Delete an application. Irreversible — also removes Vault secrets."),
+				mcp.WithDescription(`⚠️  DESTRUCTIVE — IRREVERSIBLE. Deletes the app, its CI/CD pipeline, all environment variables (Vault secrets), and removes it from the GitOps repo forever.
+
+BEFORE calling this tool you MUST:
+1. Tell the user exactly what will be deleted
+2. Ask the user to explicitly confirm with "yes"
+3. Only proceed after receiving clear confirmation
+4. Set confirm="yes" to execute`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
+				mcp.WithString("confirm", mcp.Required(), mcp.Description(`Must be exactly "yes" — only set this after the user has explicitly confirmed deletion`)),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				if req.GetString("confirm", "") != "yes" {
+					return mcp.NewToolResultError("deletion cancelled: confirm must be \"yes\". Ask the user to explicitly confirm before proceeding."), nil
+				}
 				project, err := req.RequireString("project")
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
@@ -384,7 +404,7 @@ Note: github_owner and github_repo cannot be changed after creation.`),
 			})
 
 			s.AddTool(mcp.NewTool("delete_env",
-				mcp.WithDescription("Delete specific environment variable keys from an app."),
+				mcp.WithDescription("Delete specific environment variable keys from an app. ⚠️  If the app is running, missing env vars may cause crashes on next deploy. Confirm the keys with the user before deleting."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 				mcp.WithString("keys", mcp.Required(), mcp.Description(`JSON array of key names to delete. Example: ["OLD_KEY","UNUSED_VAR"]`)),
@@ -461,10 +481,20 @@ CONSTRAINTS:
 			})
 
 			s.AddTool(mcp.NewTool("delete_addon",
-				mcp.WithDescription("Delete an addon and its persistent storage. Irreversible."),
+				mcp.WithDescription(`⚠️  DESTRUCTIVE — IRREVERSIBLE. Deletes the addon AND ALL its persistent data (database contents, files) forever. Data cannot be recovered.
+
+BEFORE calling this tool you MUST:
+1. Warn the user that ALL DATA in the addon will be permanently lost
+2. Ask the user to explicitly confirm with "yes"
+3. Only proceed after receiving clear confirmation
+4. Set confirm="yes" to execute`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("addon", mcp.Required(), mcp.Description("Addon name")),
+				mcp.WithString("confirm", mcp.Required(), mcp.Description(`Must be exactly "yes" — only set this after the user has explicitly confirmed deletion`)),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				if req.GetString("confirm", "") != "yes" {
+					return mcp.NewToolResultError("deletion cancelled: confirm must be \"yes\". Ask the user to explicitly confirm before proceeding."), nil
+				}
 				project, err := req.RequireString("project")
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
@@ -586,10 +616,19 @@ CONSTRAINTS:
 			})
 
 			s.AddTool(mcp.NewTool("remove_member",
-				mcp.WithDescription("Remove a member from a project by their GitHub username."),
+				mcp.WithDescription(`⚠️  Removes a member's access to the project. They will lose ability to deploy, manage apps, and view resources.
+
+BEFORE calling this tool you MUST:
+1. Confirm the username with the user
+2. Ask the user to explicitly confirm with "yes"
+3. Set confirm="yes" to execute`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("username", mcp.Required(), mcp.Description("GitHub username to remove")),
+				mcp.WithString("confirm", mcp.Required(), mcp.Description(`Must be exactly "yes" — only set this after the user has explicitly confirmed`)),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				if req.GetString("confirm", "") != "yes" {
+					return mcp.NewToolResultError("cancelled: confirm must be \"yes\". Ask the user to explicitly confirm before proceeding."), nil
+				}
 				project, err := req.RequireString("project")
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
