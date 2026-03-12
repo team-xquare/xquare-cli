@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -16,13 +19,25 @@ import (
 	"github.com/team-xquare/xquare-cli/cmd/schema"
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/config"
+	"github.com/team-xquare/xquare-cli/internal/output"
 )
 
 func NewMCPCmd() *cobra.Command {
-	return &cobra.Command{
+	var installClaude, installCursor, installVSCode bool
+
+	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Start MCP server (for AI agent integration)",
+		Long: `Start xquare as an MCP (Model Context Protocol) server.
+
+Use --claude, --cursor, or --vscode to register xquare as an MCP server
+in your AI tool instead of starting the server directly.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Handle IDE registration flags
+			if installClaude || installCursor || installVSCode {
+				return registerMCP(installClaude, installCursor, installVSCode)
+			}
+
 			cfg, err := config.LoadGlobal()
 			if err != nil || cfg.Token == "" {
 				return fmt.Errorf("not logged in — run: xquare login")
@@ -551,6 +566,126 @@ CONSTRAINTS:
 			fmt.Fprintln(os.Stderr, "xquare MCP server started (stdio)")
 			return server.ServeStdio(s)
 		},
+	}
+
+	cmd.Flags().BoolVar(&installClaude, "claude", false, "register xquare MCP server in Claude Desktop config")
+	cmd.Flags().BoolVar(&installCursor, "cursor", false, "register xquare MCP server in Cursor config")
+	cmd.Flags().BoolVar(&installVSCode, "vscode", false, "register xquare MCP server in VS Code config")
+	return cmd
+}
+
+// registerMCP installs xquare as an MCP server in the specified IDE configs.
+func registerMCP(claude, cursor, vscode bool) error {
+	// Resolve xquare binary path
+	xquarePath, err := exec.LookPath("xquare")
+	if err != nil {
+		// Fall back to current executable
+		xquarePath, _ = os.Executable()
+	}
+
+	mcpEntry := map[string]any{
+		"command": xquarePath,
+		"args":    []string{"mcp"},
+	}
+
+	var registered []string
+
+	if claude {
+		if err := writeMCPConfig(claudeConfigPath(), mcpEntry); err != nil {
+			return fmt.Errorf("claude: %w", err)
+		}
+		registered = append(registered, "Claude Desktop")
+	}
+	if cursor {
+		if err := writeMCPConfig(cursorConfigPath(), mcpEntry); err != nil {
+			return fmt.Errorf("cursor: %w", err)
+		}
+		registered = append(registered, "Cursor")
+	}
+	if vscode {
+		if err := writeMCPConfig(vscodeConfigPath(), mcpEntry); err != nil {
+			return fmt.Errorf("vscode: %w", err)
+		}
+		registered = append(registered, "VS Code")
+	}
+
+	for _, ide := range registered {
+		output.Success(fmt.Sprintf("registered xquare MCP server in %s", ide))
+	}
+	output.Info("restart your IDE to activate")
+	return nil
+}
+
+// writeMCPConfig merges the xquare MCP entry into the IDE's config JSON file.
+func writeMCPConfig(configPath string, entry map[string]any) error {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return err
+	}
+
+	var cfg map[string]any
+	if data, err := os.ReadFile(configPath); err == nil {
+		_ = json.Unmarshal(data, &cfg)
+	}
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+
+	servers, _ := cfg["mcpServers"].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+	}
+	servers["xquare"] = entry
+	cfg["mcpServers"] = servers
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, data, 0644)
+}
+
+func claudeConfigPath() string {
+	home, _ := os.UserHomeDir()
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
+	case "windows":
+		return filepath.Join(os.Getenv("APPDATA"), "Claude", "claude_desktop_config.json")
+	default: // linux
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			return filepath.Join(xdg, "Claude", "claude_desktop_config.json")
+		}
+		return filepath.Join(home, ".config", "Claude", "claude_desktop_config.json")
+	}
+}
+
+func cursorConfigPath() string {
+	home, _ := os.UserHomeDir()
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "Cursor", "User", "globalStorage", "cursor.mcp", "settings.json")
+	case "windows":
+		return filepath.Join(os.Getenv("APPDATA"), "Cursor", "User", "globalStorage", "cursor.mcp", "settings.json")
+	default:
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			return filepath.Join(xdg, "Cursor", "User", "globalStorage", "cursor.mcp", "settings.json")
+		}
+		return filepath.Join(home, ".config", "Cursor", "User", "globalStorage", "cursor.mcp", "settings.json")
+	}
+}
+
+func vscodeConfigPath() string {
+	home, _ := os.UserHomeDir()
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "Code", "User", "mcp.json")
+	case "windows":
+		return filepath.Join(os.Getenv("APPDATA"), "Code", "User", "mcp.json")
+	default:
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			return filepath.Join(xdg, "Code", "User", "mcp.json")
+		}
+		return filepath.Join(home, ".config", "Code", "User", "mcp.json")
 	}
 }
 

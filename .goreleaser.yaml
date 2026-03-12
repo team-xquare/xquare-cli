@@ -33,6 +33,8 @@ archives:
       - goos: windows
         formats:
           - zip
+    files:
+      - SKILL.md
 
 checksum:
   name_template: "checksums.txt"

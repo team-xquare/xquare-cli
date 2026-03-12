@@ -11,15 +11,28 @@ import (
 
 // FromCmd loads config and returns an authenticated client.
 // Exits with code 3 if not logged in.
-func FromCmd(_ *cobra.Command) *Client {
+// Priority: --server flag > XQUARE_SERVER_URL env > config file
+// Priority: XQUARE_TOKEN env > config file token
+func FromCmd(cmd *cobra.Command) *Client {
 	cfg, err := config.LoadGlobal()
 	if err != nil {
 		output.Err("failed to load config", err.Error())
 		os.Exit(6)
 	}
+	// --server flag takes highest precedence
+	if cmd != nil {
+		if s, _ := cmd.Root().PersistentFlags().GetString("server"); s != "" {
+			cfg.ServerURL = s
+		}
+	}
+	// XQUARE_TOKEN env var takes precedence over config file (for CI)
+	if t := os.Getenv("XQUARE_TOKEN"); t != "" {
+		cfg.Token = t
+	}
 	if cfg.Token == "" {
 		output.Err("not logged in", "",
-			"xquare login", "authenticate with GitHub")
+			"xquare login", "authenticate with GitHub",
+			"XQUARE_TOKEN=<token> xquare ...", "use env var in CI")
 		os.Exit(3)
 	}
 	return New(cfg.ServerURL, cfg.Token)
@@ -34,7 +47,7 @@ func IsJSON(cmd *cobra.Command) bool {
 	return v
 }
 
-// RequireProject returns project name from --project flag or .xquare/config or error.
+// RequireProject returns project name from flags, env var XQUARE_PROJECT, or .xquare/config.
 func RequireProject(cmd *cobra.Command) (string, error) {
 	p, _ := cmd.Flags().GetString("project")
 	if p != "" {
@@ -45,12 +58,16 @@ func RequireProject(cmd *cobra.Command) (string, error) {
 	if p != "" {
 		return p, nil
 	}
+	// XQUARE_PROJECT env var (for CI)
+	if p = os.Getenv("XQUARE_PROJECT"); p != "" {
+		return p, nil
+	}
 	// Try local project config
 	pc, _ := config.LoadProject()
 	if pc != nil && pc.Project != "" {
 		return pc.Project, nil
 	}
-	return "", fmt.Errorf("project not specified (use --project or run 'xquare link <project>')")
+	return "", fmt.Errorf("project not specified\n\n  xquare link <project>              set default project\n  xquare ... --project <name>        use per-command\n  XQUARE_PROJECT=<name> xquare ...   use env var in CI")
 }
 
 // GetCurrentProject returns the currently linked project without requiring it.
@@ -58,6 +75,9 @@ func RequireProject(cmd *cobra.Command) (string, error) {
 func GetCurrentProject(cmd *cobra.Command) (string, error) {
 	p, _ := cmd.Root().PersistentFlags().GetString("project")
 	if p != "" {
+		return p, nil
+	}
+	if p = os.Getenv("XQUARE_PROJECT"); p != "" {
 		return p, nil
 	}
 	pc, _ := config.LoadProject()

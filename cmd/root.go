@@ -52,12 +52,14 @@ func init() {
 	rootCmd.PersistentFlags().Bool("json", false, "output as JSON")
 	rootCmd.PersistentFlags().String("jq", "", "filter JSON output with a jq expression")
 	rootCmd.PersistentFlags().StringSlice("fields", nil, "select fields from JSON response (e.g. name,status)")
-	rootCmd.PersistentFlags().StringP("project", "p", "", "project name (overrides .xquare/config)")
+	rootCmd.PersistentFlags().StringP("project", "p", "", "project name (overrides XQUARE_PROJECT or .xquare/config)")
 	rootCmd.PersistentFlags().Bool("no-input", false, "disable interactive prompts (useful in CI)")
+	rootCmd.PersistentFlags().String("server", "", "xquare server URL (overrides XQUARE_SERVER_URL)")
 
 	rootCmd.AddCommand(
 		newVersionCmd(),
-		auth.NewLoginCmd(),
+		auth.NewAuthCmd(),
+		auth.NewLoginCmd(), // keep top-level `xquare login` shortcut
 		project.NewProjectCmd(),
 		app.NewAppCmd(),
 		deploy.NewDeployCmd(),
