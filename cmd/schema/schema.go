@@ -106,7 +106,7 @@ func buildSchema() map[string]any {
 			addonSchema(),
 			{
 				Command:     "trigger <app>",
-				Description: "Manually trigger CI/CD for the latest commit. Use --watch to wait until deployment completes.",
+				Description: "Force re-run CI/CD for the latest commit. NOTE: CI/CD normally runs automatically on git push — only use this when the automatic webhook failed or you need to re-deploy without a code change. Use --watch to wait until deployment completes.",
 				Args:        []ArgSchema{{Name: "app", Required: true}},
 				Flags: []FlagSchema{
 					{Name: "watch", Type: "bool", Desc: "wait until deployment is fully running"},

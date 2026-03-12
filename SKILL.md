@@ -62,14 +62,16 @@ xquare app create my-api \
   --branch main
 
 # 2. Wait ~2 minutes for CI infrastructure to initialize
-# 3. Deploy
-xquare trigger my-api
+# 3. Push code — CI/CD runs automatically on every git push
+git push origin main
 
-# 4. Watch deployment
-xquare trigger my-api --watch
-# or stream logs
-xquare logs my-api --build
-xquare logs my-api -f
+# 4. Watch deployment progress (optional)
+xquare logs my-api --build                    # stream build logs
+xquare logs my-api -f                         # stream runtime logs
+xquare app status my-api                      # check running status
+
+# NOTE: xquare trigger is only for forcing a re-run when auto CI failed
+# (webhook issue, etc.) — do NOT use it in the normal push workflow
 ```
 
 ### Manage environment variables

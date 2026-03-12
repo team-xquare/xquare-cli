@@ -499,7 +499,7 @@ CONSTRAINTS:
 			// ── Deploy & logs ─────────────────────────────────────────────
 
 			s.AddTool(mcp.NewTool("trigger",
-				mcp.WithDescription("Trigger re-deploy with the latest commit. CI pipeline must be ready (ciReady=true in get_app_status). Returns build workflow name."),
+				mcp.WithDescription("Force re-run CI/CD with the latest commit. NOTE: CI/CD runs automatically on git push — only use this when the automatic webhook failed or you need to re-deploy without a code change. CI pipeline must be ready (ciReady=true in get_app_status). Returns build workflow name."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

@@ -16,7 +16,14 @@ func NewTriggerCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "trigger <app>",
-		Short: "Manually trigger CI/CD for the latest commit",
+		Short: "Force re-run CI/CD (normally triggered automatically on git push)",
+		Long: `Force a CI/CD run for the latest commit.
+
+NOTE: CI/CD runs automatically when you push to GitHub — you do NOT need this command in normal workflow.
+Use trigger only when:
+  - The automatic webhook failed (network issue, GitHub App misconfiguration)
+  - You need to re-deploy without making a code change
+  - You want to watch deployment progress with --watch`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			project, err := api.RequireProject(cmd)
