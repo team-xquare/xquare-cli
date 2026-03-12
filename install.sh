@@ -58,8 +58,14 @@ tar -xzf "${TMP}/${ARCHIVE}" -C "$TMP"
 # Install binary
 if [ -w "$INSTALL_DIR" ]; then
   mv "${TMP}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-else
+elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
   sudo mv "${TMP}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+else
+  # Fallback to ~/.local/bin
+  INSTALL_DIR="$HOME/.local/bin"
+  mkdir -p "$INSTALL_DIR"
+  mv "${TMP}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
+  echo "Note: installed to $INSTALL_DIR (add to PATH if needed)"
 fi
 
 chmod +x "${INSTALL_DIR}/${BINARY}"
