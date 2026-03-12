@@ -719,9 +719,9 @@ func newAppTunnelCmd() *cobra.Command {
 				localPort = tunnelPort
 			}
 
-			wstunnelBin, tmpPath, appTunnelErr := appResolveBinary()
-			if tmpPath != "" {
-				defer os.Remove(tmpPath)
+			wstunnelBin, cleanupBin, appTunnelErr := appResolveBinary()
+			if cleanupBin != nil {
+				defer cleanupBin()
 			}
 			if appTunnelErr != nil {
 				return appTunnelErr
@@ -760,16 +760,8 @@ func newAppTunnelCmd() *cobra.Command {
 	return cmd
 }
 
-func appResolveBinary() (binPath, tmpPath string, err error) {
-	tmp, extractErr := tunnel.ExtractWstunnel()
-	if extractErr == nil {
-		return tmp, tmp, nil
-	}
-	sys, sysErr := exec.LookPath("wstunnel")
-	if sysErr == nil {
-		return sys, "", nil
-	}
-	return "", "", fmt.Errorf("wstunnel not available: %v", extractErr)
+func appResolveBinary() (binPath string, cleanup func(), err error) {
+	return tunnel.ExtractWstunnel()
 }
 
 // parseEndpoints parses --endpoint flags of the form "<port>[:<route1>,<route2>...]"
