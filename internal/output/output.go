@@ -84,3 +84,63 @@ func NDJSONLine(v any) error {
 	_, err = fmt.Printf("%s\n", b)
 	return err
 }
+
+// JSONWithFilter prints v as JSON, optionally filtered by jq expression or fields.
+func JSONWithFilter(v any, jqExpr string, fields []string) error {
+	if jqExpr == "" && len(fields) == 0 {
+		return JSON(v)
+	}
+	// Marshal to bytes first
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	var raw any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	// Apply --fields before --jq
+	if len(fields) > 0 {
+		raw = applyFields(raw, fields)
+	}
+	if jqExpr != "" {
+		raw, err = applyJQ(raw, jqExpr)
+		if err != nil {
+			return fmt.Errorf("jq: %w", err)
+		}
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(raw)
+}
+
+func applyFields(v any, fields []string) any {
+	fieldSet := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		fieldSet[strings.TrimSpace(f)] = true
+	}
+	switch val := v.(type) {
+	case map[string]any:
+		out := make(map[string]any)
+		for _, f := range fields {
+			if x, ok := val[f]; ok {
+				out[f] = x
+			}
+		}
+		return out
+	case []any:
+		result := make([]any, 0, len(val))
+		for _, item := range val {
+			result = append(result, applyFields(item, fields))
+		}
+		return result
+	default:
+		_ = fieldSet
+		return v
+	}
+}
+
+func applyJQ(v any, expr string) (any, error) {
+	// Import is handled at package level — add to imports below
+	return applyGojq(v, expr)
+}
