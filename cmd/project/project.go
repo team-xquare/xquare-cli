@@ -20,6 +20,9 @@ func NewProjectCmd() *cobra.Command {
 		newGetCmd(),
 		newCreateCmd(),
 		newDeleteCmd(),
+		newMembersCmd(),
+		newAddMemberCmd(),
+		newRemoveMemberCmd(),
 	)
 	return cmd
 }
@@ -116,5 +119,82 @@ func newDeleteCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "confirm deletion")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
+	return cmd
+}
+
+func newMembersCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "members",
+		Short: "List project members",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := api.FromCmd(cmd)
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			members, err := c.ListMembers(cmd.Context(), project)
+			if err != nil {
+				return err
+			}
+			if api.IsJSON(cmd) {
+				return output.JSON(members)
+			}
+			if len(members) == 0 {
+				output.Info("no members found")
+				return nil
+			}
+			rows := make([][]string, len(members))
+			for i, m := range members {
+				rows[i] = []string{m}
+			}
+			output.Table([]string{"USERNAME"}, rows)
+			return nil
+		},
+	}
+}
+
+func newAddMemberCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "add-member <github-username>",
+		Short: "Add a member to the project",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := api.FromCmd(cmd)
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			if err := c.AddMember(cmd.Context(), project, args[0]); err != nil {
+				return err
+			}
+			output.Success(fmt.Sprintf("added %s to project %s", args[0], project))
+			return nil
+		},
+	}
+}
+
+func newRemoveMemberCmd() *cobra.Command {
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "remove-member <github-username>",
+		Short: "Remove a member from the project",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !yes {
+				return fmt.Errorf("use --yes to confirm removing %s", args[0])
+			}
+			c := api.FromCmd(cmd)
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			if err := c.RemoveMember(cmd.Context(), project, args[0]); err != nil {
+				return err
+			}
+			output.Success(fmt.Sprintf("removed %s from project %s", args[0], project))
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "confirm removal")
 	return cmd
 }
