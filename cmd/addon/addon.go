@@ -258,7 +258,7 @@ func newAddonConnectCmd() *cobra.Command {
 			password := fmt.Sprintf("%v", conn["password"])
 
 			if localPort == 0 {
-				localPort = tunnelPort
+				localPort = freePort(tunnelPort)
 			}
 
 			wstunnelBin, cleanupBin, err := resolveBinary()
@@ -321,7 +321,7 @@ func newAddonTunnelCmd() *cobra.Command {
 			addonType := fmt.Sprintf("%v", conn["type"])
 
 			if localPort == 0 {
-				localPort = tunnelPort
+				localPort = freePort(tunnelPort)
 			}
 
 			connStr := connectionString(addonType, "127.0.0.1", strconv.Itoa(localPort), password, addonName)
@@ -389,6 +389,22 @@ func startTunnelProc(bin, tunnelHost, password, serviceName string, servicePort,
 		return nil, err
 	}
 	return cmd.Process, nil
+}
+
+// freePort returns preferred if it's available, otherwise finds a random free port.
+func freePort(preferred int) int {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", preferred), 200*time.Millisecond)
+	if err != nil {
+		return preferred // port is free
+	}
+	conn.Close()
+	// preferred is in use — ask OS for a free port
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return preferred
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }
 
 func waitPortReady(port int, timeout time.Duration) error {

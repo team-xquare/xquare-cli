@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -717,7 +719,7 @@ func newAppTunnelCmd() *cobra.Command {
 			}
 
 			if localPort == 0 {
-				localPort = tunnelPort
+				localPort = appFreePort(tunnelPort)
 			}
 
 			if printURL {
@@ -769,6 +771,20 @@ func newAppTunnelCmd() *cobra.Command {
 
 func appResolveBinary() (binPath string, cleanup func(), err error) {
 	return tunnel.ExtractWstunnel()
+}
+
+func appFreePort(preferred int) int {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", preferred), 200*time.Millisecond)
+	if err != nil {
+		return preferred
+	}
+	conn.Close()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return preferred
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }
 
 // parseEndpoints parses --endpoint flags of the form "<port>[:<route1>,<route2>...]"
