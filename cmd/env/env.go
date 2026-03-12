@@ -70,6 +70,7 @@ func newEnvGetCmd() *cobra.Command {
 // set: default is MERGE (patch). Use --replace for full replace.
 func newEnvSetCmd() *cobra.Command {
 	var replace bool
+	var yes bool
 	var dryRun bool
 
 	cmd := &cobra.Command{
@@ -96,6 +97,10 @@ func newEnvSetCmd() *cobra.Command {
 					return fmt.Errorf("invalid key %q: keys cannot contain spaces or tabs", key)
 				}
 				envs[key] = parts[1]
+			}
+
+			if replace && !yes && !dryRun {
+				return fmt.Errorf("--replace deletes ALL existing env vars\n\n  use --yes to confirm, or --dry-run to preview")
 			}
 
 			if dryRun {
@@ -128,6 +133,7 @@ func newEnvSetCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&replace, "replace", false, "full replace instead of merge (DANGER: deletes all existing vars)")
+	cmd.Flags().BoolVar(&yes, "yes", false, "confirm --replace operation")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
 }
