@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +27,10 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Suppress usage on runtime errors (usage only makes sense for wrong flags/args)
 		cmd.SilenceUsage = true
+		isJSON, _ := cmd.Root().PersistentFlags().GetBool("json")
+		noInput, _ := cmd.Root().PersistentFlags().GetBool("no-input")
+		output.SetJSONMode(isJSON)
+		output.SetNoInput(noInput)
 		jq, _ := cmd.Root().PersistentFlags().GetString("jq")
 		fields, _ := cmd.Root().PersistentFlags().GetStringSlice("fields")
 		output.SetGlobalFilters(jq, fields)
@@ -37,6 +42,7 @@ func init() {
 	rootCmd.PersistentFlags().String("jq", "", "filter JSON output with a jq expression")
 	rootCmd.PersistentFlags().StringSlice("fields", nil, "select fields from JSON response (e.g. name,status)")
 	rootCmd.PersistentFlags().StringP("project", "p", "", "project name (overrides .xquare/config)")
+	rootCmd.PersistentFlags().Bool("no-input", false, "disable interactive prompts (useful in CI)")
 
 	rootCmd.AddCommand(
 		auth.NewLoginCmd(),
@@ -56,7 +62,40 @@ func init() {
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		if output.IsJSONMode() {
+			// Classify error into machine-readable code
+			msg := err.Error()
+			code := classifyError(msg)
+			output.PrintJSONError(code, msg, "")
+		}
 		os.Exit(1)
+	}
+}
+
+// classifyError maps common error patterns to machine-readable codes
+func classifyError(msg string) string {
+	lower := strings.ToLower(msg)
+	switch {
+	case strings.Contains(lower, "not logged in") || strings.Contains(lower, "unauthorized"):
+		return "auth_error"
+	case strings.Contains(lower, "not found") || strings.Contains(lower, "404"):
+		return "not_found"
+	case strings.Contains(lower, "already exists") || strings.Contains(lower, "409") || strings.Contains(lower, "conflict"):
+		return "conflict"
+	case strings.Contains(lower, "invalid project name"):
+		return "invalid_project_name"
+	case strings.Contains(lower, "invalid app name"):
+		return "invalid_app_name"
+	case strings.Contains(lower, "storage") && strings.Contains(lower, "4gi"):
+		return "storage_too_large"
+	case strings.Contains(lower, "ci_not_ready") || strings.Contains(lower, "ci not ready"):
+		return "ci_not_ready"
+	case strings.Contains(lower, "timeout"):
+		return "timeout"
+	case strings.Contains(lower, "server error") || strings.Contains(lower, "500"):
+		return "server_error"
+	default:
+		return "error"
 	}
 }
 

@@ -35,12 +35,17 @@ func NewSchemaCmd() *cobra.Command {
 		Use:   "schema",
 		Short: "Show machine-readable schema of all commands (for AI agents)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s := buildSchema()
+			s := BuildSchema()
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
 			return enc.Encode(s)
 		},
 	}
+}
+
+// BuildSchema returns the full CLI schema as a map (exported for MCP use)
+func BuildSchema() map[string]any {
+	return buildSchema()
 }
 
 func buildSchema() map[string]any {

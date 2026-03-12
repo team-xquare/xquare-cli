@@ -1,9 +1,11 @@
 package mcp
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 
+	"github.com/team-xquare/xquare-cli/cmd/schema"
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/config"
 )
@@ -225,7 +228,83 @@ After creation, CI pipeline takes ~2-3 minutes to prepare. Then call deploy tool
 				return jsonResult(data, err)
 			})
 
-			s.AddTool(mcp.NewTool("delete_app",
+			s.AddTool(mcp.NewTool("update_app",
+				mcp.WithDescription(`Update application configuration. Only specified fields are changed.
+
+Updatable fields: build_type, endpoints, github_branch, trigger_paths, build_options
+Note: github_owner and github_repo cannot be changed after creation.`),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
+				mcp.WithString("build_type", mcp.Description("New build type: gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),
+				mcp.WithString("endpoints", mcp.Description(`JSON array of endpoint strings. Example: ["8080:api.dsmhs.kr","9090"]`)),
+				mcp.WithString("github_branch", mcp.Description("New GitHub branch")),
+				mcp.WithString("trigger_paths", mcp.Description("Comma-separated CI trigger paths, e.g. src/**,Dockerfile")),
+				mcp.WithString("build_options", mcp.Description("JSON object of build-type specific options")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				appName, err := req.RequireString("app")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				// Fetch existing config as base
+				existing, err := client.GetApp(ctx, project, appName)
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				body := existing
+				body["name"] = appName
+
+				if bt := req.GetString("build_type", ""); bt != "" {
+					buildOpts := map[string]any{}
+					if boStr := req.GetString("build_options", ""); boStr != "" {
+						if e := json.Unmarshal([]byte(boStr), &buildOpts); e != nil {
+							return mcp.NewToolResultError("invalid build_options JSON: " + e.Error()), nil
+						}
+					}
+					body["build"] = map[string]any{bt: buildOpts}
+				}
+
+				if epStr := req.GetString("endpoints", ""); epStr != "" {
+					var eps []string
+					if e := json.Unmarshal([]byte(epStr), &eps); e != nil {
+						return mcp.NewToolResultError("invalid endpoints JSON: " + e.Error()), nil
+					}
+					var endpoints []map[string]any
+					for _, ep := range eps {
+						parts := strings.SplitN(ep, ":", 2)
+						port := 0
+						if _, e := fmt.Sscanf(parts[0], "%d", &port); e != nil || port <= 0 {
+							return mcp.NewToolResultError(fmt.Sprintf("invalid endpoint port in %q", ep)), nil
+						}
+						m := map[string]any{"port": port}
+						if len(parts) == 2 && parts[1] != "" {
+							m["routes"] = strings.Split(parts[1], ",")
+						}
+						endpoints = append(endpoints, m)
+					}
+					body["endpoints"] = endpoints
+				}
+
+				if branch := req.GetString("github_branch", ""); branch != "" {
+					if gh, ok := body["github"].(map[string]any); ok {
+						gh["branch"] = branch
+					}
+				}
+
+				if tp := req.GetString("trigger_paths", ""); tp != "" {
+					if gh, ok := body["github"].(map[string]any); ok {
+						gh["triggerPaths"] = strings.Split(tp, ",")
+					}
+				}
+
+				data, err := client.UpdateApp(ctx, project, appName, body)
+				return jsonResult(data, err)
+			})
+
+		s.AddTool(mcp.NewTool("delete_app",
 				mcp.WithDescription("Delete an application. Irreversible — also removes Vault secrets."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
@@ -419,6 +498,54 @@ CONSTRAINTS:
 				}
 				data, err := client.RedeployApp(ctx, project, app)
 				return jsonResult(data, err)
+			})
+
+			s.AddTool(mcp.NewTool("get_logs",
+				mcp.WithDescription("Get recent runtime logs for an app. Returns last N lines as text. For real-time streaming, use 'xquare logs <app> -f' CLI command instead."),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
+				mcp.WithNumber("tail", mcp.Description("Number of lines from end (default: 100, max: 500)")),
+				mcp.WithString("since", mcp.Description("Show logs since duration, e.g. 1h, 30m")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				appName, err := req.RequireString("app")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				tail := int64(req.GetFloat("tail", 100))
+				if tail > 500 {
+					tail = 500
+				}
+				since := req.GetString("since", "")
+				resp, err := client.StreamLogs(ctx, project, appName, tail, false, since)
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				defer resp.Body.Close()
+				if resp.StatusCode >= 400 {
+					b, _ := io.ReadAll(resp.Body)
+					return mcp.NewToolResultError(fmt.Sprintf("server error %d: %s", resp.StatusCode, string(b))), nil
+				}
+				var lines []string
+				scanner := bufio.NewScanner(resp.Body)
+				for scanner.Scan() {
+					lines = append(lines, scanner.Text())
+				}
+				return mcp.NewToolResultText(strings.Join(lines, "\n")), nil
+			})
+
+			s.AddTool(mcp.NewTool("schema",
+				mcp.WithDescription("Return the full xquare CLI command schema with all constraints, valid values, and examples. Call this first to understand all available commands before doing anything else."),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				s := schema.BuildSchema()
+				b, err := json.MarshalIndent(s, "", "  ")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				return mcp.NewToolResultText(string(b)), nil
 			})
 
 			fmt.Fprintln(os.Stderr, "xquare MCP server started (stdio)")

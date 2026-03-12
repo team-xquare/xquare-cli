@@ -10,7 +10,25 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-// IsTTY returns true if stdout is a terminal
+// global mode flags set from CLI flags in PersistentPreRun
+var jsonMode bool
+var noInput bool
+
+// SetJSONMode activates machine-readable JSON output mode
+func SetJSONMode(v bool) { jsonMode = v }
+
+// IsJSONMode returns true if --json flag is active
+func IsJSONMode() bool { return jsonMode }
+
+// SetNoInput activates non-interactive mode (no prompts)
+func SetNoInput(v bool) { noInput = v }
+
+// IsNonInteractive returns true when running in CI, non-TTY, or --no-input mode
+func IsNonInteractive() bool {
+	return noInput || !IsTTY()
+}
+
+// IsTTY returns true if stdout is a terminal and not in CI/no-color mode
 func IsTTY() bool {
 	if os.Getenv("CI") == "true" || os.Getenv("NO_COLOR") != "" {
 		return false
@@ -86,6 +104,26 @@ func Err(what, why string, next ...string) {
 			fmt.Fprintf(os.Stderr, "  %-40s %s\n", cmd, desc)
 		}
 	}
+}
+
+// JSONErrorPayload is the structured error output when --json is active
+type JSONErrorPayload struct {
+	Error      bool   `json:"error"`
+	Code       string `json:"code,omitempty"`
+	Message    string `json:"message"`
+	Suggestion string `json:"suggestion,omitempty"`
+}
+
+// PrintJSONError writes a structured JSON error to stdout (used when --json is active)
+func PrintJSONError(code, message, suggestion string) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(JSONErrorPayload{
+		Error:      true,
+		Code:       code,
+		Message:    message,
+		Suggestion: suggestion,
+	})
 }
 
 // NDJSONLine writes one JSON line to stdout (for streaming)
