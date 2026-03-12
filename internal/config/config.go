@@ -89,7 +89,7 @@ func LoadProject() (*ProjectConfig, error) {
 
 // SaveProject writes .xquare/config in the current directory
 func SaveProject(cfg *ProjectConfig) error {
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return err
 	}
 	data, err := yaml.Marshal(cfg)
