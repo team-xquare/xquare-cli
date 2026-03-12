@@ -61,7 +61,14 @@ func newAllowlistListCmd() *cobra.Command {
 			rows := make([][]string, 0, len(users))
 			for _, u := range users {
 				// handle both lowercase (json tagged) and capitalized (untagged) field names
-				id := fmt.Sprintf("%v", coalesce(u["id"], u["ID"]))
+				idVal := coalesce(u["id"], u["ID"])
+				var id string
+				switch v := idVal.(type) {
+				case float64:
+					id = fmt.Sprintf("%d", int64(v))
+				default:
+					id = fmt.Sprintf("%v", v)
+				}
 				username := fmt.Sprintf("%v", coalesce(u["username"], u["Username"]))
 				rows = append(rows, []string{username, id})
 			}
