@@ -245,6 +245,11 @@ func newEnvPushCmd() *cobra.Command {
 			}
 			defer f.Close()
 
+			const maxEnvFileBytes = 5 * 1024 * 1024 // 5 MiB
+			if info, err := f.Stat(); err == nil && info.Size() > maxEnvFileBytes {
+				return fmt.Errorf(".env file exceeds maximum size of 5 MiB (%d bytes)", info.Size())
+			}
+
 			envs := make(map[string]string)
 			scanner := bufio.NewScanner(f)
 			for scanner.Scan() {

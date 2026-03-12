@@ -81,7 +81,9 @@ func receiveOAuthCode() (string, error) {
 	output.Info("Open this URL in your browser:")
 	output.Info(authURL)
 
-	srv := &http.Server{Addr: ":9999"}
+	// Bind to loopback only — prevents network-adjacent attackers from
+	// intercepting the OAuth authorization code on the callback port.
+	srv := &http.Server{Addr: "127.0.0.1:9999"}
 	mux := http.NewServeMux()
 	srv.Handler = mux
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {

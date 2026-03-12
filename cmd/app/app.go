@@ -851,9 +851,14 @@ func parseEndpoints(strs []string) ([]map[string]any, error) {
 			routes := strings.Split(parts[1], ",")
 			var filtered []string
 			for _, r := range routes {
-				if r = strings.TrimSpace(r); r != "" {
-					filtered = append(filtered, r)
+				r = strings.TrimSpace(r)
+				if r == "" {
+					continue
 				}
+				if err := validateRouteHost(r); err != nil {
+					return nil, fmt.Errorf("invalid route %q: %w", r, err)
+				}
+				filtered = append(filtered, r)
 			}
 			if len(filtered) > 0 {
 				ep["routes"] = filtered
@@ -862,6 +867,23 @@ func parseEndpoints(strs []string) ([]map[string]any, error) {
 		endpoints = append(endpoints, ep)
 	}
 	return endpoints, nil
+}
+
+// validateRouteHost checks that a route hostname contains only printable ASCII
+// characters and is within length limits. The server enforces full DNS validation.
+func validateRouteHost(host string) error {
+	if len(host) > 253 {
+		return fmt.Errorf("hostname exceeds 253 characters")
+	}
+	for _, b := range []byte(host) {
+		if b == 0 {
+			return fmt.Errorf("hostname contains null byte")
+		}
+		if b < 0x20 || b > 0x7e {
+			return fmt.Errorf("hostname contains non-printable or non-ASCII character")
+		}
+	}
+	return nil
 }
 
 func newDashboardCmd() *cobra.Command {
