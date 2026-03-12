@@ -156,9 +156,14 @@ func (c *Client) DeleteProject(ctx context.Context, project string) error {
 	return c.delete(ctx, "/projects/"+project)
 }
 
-func (c *Client) ListMembers(ctx context.Context, project string) ([]string, error) {
+type Owner struct {
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
+}
+
+func (c *Client) ListMembers(ctx context.Context, project string) ([]Owner, error) {
 	var out struct {
-		Owners []string `json:"owners"`
+		Owners []Owner `json:"owners"`
 	}
 	return out.Owners, c.get(ctx, "/projects/"+project+"/members", &out)
 }
