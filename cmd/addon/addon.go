@@ -188,11 +188,11 @@ func newAddonDeleteCmd() *cobra.Command {
 	return cmd
 }
 
-// xquare addon get <name> — show connection info (no tunnel hints)
+// xquare addon status <name> — show status and connection info
 func newAddonGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get <name>",
-		Short: "Show connection info for an addon",
+		Use:   "status <name>",
+		Short: "Show status and connection info for an addon",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := api.FromCmd(cmd)

@@ -85,7 +85,7 @@ xquare env push my-api -f .env.prod               # upload from file
 ```bash
 xquare addon create mydb postgresql --storage 2Gi  # provision
 xquare addon list --json                            # check status (ready: true/false)
-xquare addon get mydb --json                        # connection info
+xquare addon status mydb --json                     # status & connection info
 xquare addon tunnel mydb                            # local port forwarding
 xquare addon connect mydb                           # interactive session (mysql/psql/redis-cli)
 xquare addon delete mydb --yes                      # delete (irreversible)

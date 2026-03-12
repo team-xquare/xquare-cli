@@ -410,10 +410,10 @@ func addonSchema() CommandSchema {
 				Examples: []string{"xquare addon delete mydb --yes"},
 			},
 			{
-				Command:     "addon get <name>",
-				Description: "Show connection info for an addon (host, port, password). Password is the wstunnel access key.",
+				Command:     "addon status <name>",
+				Description: "Show status and connection info for an addon (ready, host, port, password). Password is the wstunnel access key.",
 				Args:        []ArgSchema{{Name: "name", Required: true}},
-				Examples:    []string{"xquare addon get mydb", "xquare addon get mydb --json"},
+				Examples:    []string{"xquare addon status mydb", "xquare addon status mydb --json"},
 			},
 			{
 				Command:     "addon connect <name>",
