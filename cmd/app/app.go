@@ -195,10 +195,9 @@ func newCreateCmd() *cobra.Command {
 			owner, _ := cmd.Flags().GetString("owner")
 			repo, _ := cmd.Flags().GetString("repo")
 			branch, _ := cmd.Flags().GetString("branch")
-			installID, _ := cmd.Flags().GetString("installation-id")
 			port, _ := cmd.Flags().GetInt("port")
 			routes, _ := cmd.Flags().GetStringSlice("routes")
-			body := buildAppBody(appName, buildType, owner, repo, branch, installID, port, routes, cmd)
+			body := buildAppBody(appName, buildType, owner, repo, branch, port, routes, cmd)
 			if dryRun {
 				output.Info(fmt.Sprintf("[dry-run] would create app %s in project %s", appName, project))
 				return output.JSON(body)
@@ -220,7 +219,6 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().String("owner", "team-xquare", "GitHub owner")
 	cmd.Flags().String("repo", "", "GitHub repository name")
 	cmd.Flags().String("branch", "main", "GitHub branch")
-	cmd.Flags().String("installation-id", "62433388", "GitHub App installation ID")
 	cmd.Flags().Int("port", 8080, "application port")
 	cmd.Flags().StringSlice("routes", []string{}, "HTTP routes (e.g. myapp.dsmhs.kr)")
 	cmd.Flags().String("java-version", "17", "Java version")
@@ -257,8 +255,7 @@ func newUpdateCmd() *cobra.Command {
 			}
 			body := existing
 			body["name"] = appName
-			if cmd.Flags().Changed("owner") || cmd.Flags().Changed("repo") ||
-				cmd.Flags().Changed("branch") || cmd.Flags().Changed("installation-id") {
+			if cmd.Flags().Changed("owner") || cmd.Flags().Changed("repo") || cmd.Flags().Changed("branch") {
 				// start from existing github fields
 				gh := map[string]any{}
 				if existingGH, ok := existing["github"].(map[string]any); ok {
@@ -277,10 +274,6 @@ func newUpdateCmd() *cobra.Command {
 				if cmd.Flags().Changed("branch") {
 					branch, _ := cmd.Flags().GetString("branch")
 					gh["branch"] = branch
-				}
-				if cmd.Flags().Changed("installation-id") {
-					installID, _ := cmd.Flags().GetString("installation-id")
-					gh["installationId"] = installID
 				}
 				body["github"] = gh
 			}
@@ -333,7 +326,6 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().String("owner", "", "GitHub owner")
 	cmd.Flags().String("repo", "", "GitHub repository")
 	cmd.Flags().String("branch", "", "GitHub branch")
-	cmd.Flags().String("installation-id", "", "GitHub App installation ID")
 	cmd.Flags().Int("port", 0, "application port")
 	cmd.Flags().StringSlice("routes", []string{}, "HTTP routes")
 	cmd.Flags().String("java-version", "17", "Java version")
@@ -447,14 +439,13 @@ func buildBody(buildType string, cmd *cobra.Command) map[string]any {
 	}
 }
 
-func buildAppBody(name, buildType, owner, repo, branch, installID string, port int, routes []string, cmd *cobra.Command) map[string]any {
+func buildAppBody(name, buildType, owner, repo, branch string, port int, routes []string, cmd *cobra.Command) map[string]any {
 	body := map[string]any{
 		"name": name,
 		"github": map[string]any{
-			"owner":          owner,
-			"repo":           repo,
-			"branch":         branch,
-			"installationId": installID,
+			"owner":  owner,
+			"repo":   repo,
+			"branch": branch,
 		},
 		"build": buildBody(buildType, cmd),
 	}
