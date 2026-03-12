@@ -49,6 +49,7 @@ func init() {
 		db.NewDBCmd(),
 		mcp.NewMCPCmd(),
 		newLinkCmd(),
+		newUnlinkCmd(),
 		newWhoamiCmd(),
 	)
 }
@@ -91,6 +92,27 @@ func newLinkCmd() *cobra.Command {
 	}
 }
 
+// xquare unlink
+func newUnlinkCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "unlink",
+		Short: "Remove project link from current directory",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pc, _ := config.LoadProject()
+			if pc == nil || pc.Project == "" {
+				output.Info("no project linked in this directory")
+				return nil
+			}
+			prev := pc.Project
+			if err := config.SaveProject(&config.ProjectConfig{}); err != nil {
+				return fmt.Errorf("remove project link: %w", err)
+			}
+			output.Success("unlinked from project " + prev)
+			return nil
+		},
+	}
+}
+
 // xquare whoami
 func newWhoamiCmd() *cobra.Command {
 	return &cobra.Command{
@@ -105,10 +127,21 @@ func newWhoamiCmd() *cobra.Command {
 				output.Err("not logged in", "", "xquare login", "authenticate with GitHub")
 				os.Exit(3)
 			}
+			project := ""
+			if pc, _ := config.LoadProject(); pc != nil {
+				project = pc.Project
+			}
 			if isJSON, _ := cmd.Root().PersistentFlags().GetBool("json"); isJSON {
-				return output.JSON(map[string]string{"username": cfg.Username})
+				m := map[string]string{"username": cfg.Username}
+				if project != "" {
+					m["project"] = project
+				}
+				return output.JSON(m)
 			}
 			fmt.Println(cfg.Username)
+			if project != "" {
+				output.Info(fmt.Sprintf("project: %s", project))
+			}
 			return nil
 		},
 	}

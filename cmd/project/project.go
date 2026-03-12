@@ -140,18 +140,33 @@ func newDeleteCmd() *cobra.Command {
 		Short: "Delete a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			projectName := args[0]
 			if dryRun {
-				output.Info(fmt.Sprintf("[dry-run] would delete project: %s", args[0]))
+				output.Info(fmt.Sprintf("[dry-run] would delete project: %s", projectName))
 				return nil
 			}
-			if !yes {
-				return fmt.Errorf("use --yes to confirm deletion (this will delete the project and all its resources)")
-			}
 			c := api.FromCmd(cmd)
-			if err := c.DeleteProject(cmd.Context(), args[0]); err != nil {
+			if !yes {
+				// Show what will be deleted
+				if p, err := c.GetProject(cmd.Context(), projectName); err == nil {
+					appCount := 0
+					addonCount := 0
+					if apps, ok := p["applications"].([]any); ok {
+						appCount = len(apps)
+					}
+					if addons, ok := p["addons"].([]any); ok {
+						addonCount = len(addons)
+					}
+					if appCount > 0 || addonCount > 0 {
+						output.Info(fmt.Sprintf("project %q contains %d app(s) and %d addon(s) — all will be deleted", projectName, appCount, addonCount))
+					}
+				}
+				return fmt.Errorf("use --yes to confirm deletion of project %q", projectName)
+			}
+			if err := c.DeleteProject(cmd.Context(), projectName); err != nil {
 				return err
 			}
-			output.Success("deleted project " + args[0])
+			output.Success("deleted project " + projectName)
 			return nil
 		},
 	}
@@ -176,6 +191,9 @@ func newMembersCmd() *cobra.Command {
 				return err
 			}
 			if api.IsJSON(cmd) {
+				if members == nil {
+					members = []api.Owner{}
+				}
 				return output.JSON(members)
 			}
 			if len(members) == 0 {

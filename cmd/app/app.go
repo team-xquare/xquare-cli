@@ -101,8 +101,10 @@ func newListCmd() *cobra.Command {
 				statusStr, instances := "unknown", "-"
 				if r.err == nil && r.status != nil {
 					statusStr = fmt.Sprintf("%v", r.status["status"])
-					if sc, ok := r.status["scale"].(map[string]any); ok {
-						instances = fmt.Sprintf("%v/%v", sc["running"], sc["desired"])
+					if statusStr != "not_deployed" {
+						if sc, ok := r.status["scale"].(map[string]any); ok {
+							instances = fmt.Sprintf("%v/%v", sc["running"], sc["desired"])
+						}
 					}
 				}
 				rows = append(rows, []string{r.name, statusStr, instances, hash})
@@ -183,7 +185,9 @@ func newStatusCmd() *cobra.Command {
 			deployPhase := fmt.Sprintf("%v", status["deployPhase"])
 			ciReady := fmt.Sprintf("%v", status["ciReady"]) == "true"
 			version := fmt.Sprintf("%v", status["version"])
-			if len(version) > 8 {
+			if version == "" || version == "<nil>" {
+				version = "-"
+			} else if len(version) > 8 {
 				version = version[:8]
 			}
 			running, desired := "?", "?"
@@ -201,14 +205,24 @@ func newStatusCmd() *cobra.Command {
 				statusDisplay = appStatus + "  (배포 동기화 중...)"
 			}
 
+			// Instances display
+			instancesDisplay := fmt.Sprintf("%s/%s running", running, desired)
+			if appStatus == "not_deployed" {
+				instancesDisplay = "-"
+			}
+
 			rows := [][]string{
 				{"Status", statusDisplay},
-				{"Instances", fmt.Sprintf("%s/%s running", running, desired)},
+				{"Instances", instancesDisplay},
 				{"Version", version},
 			}
 
-			if !ciReady && appStatus == "not_deployed" {
-				rows = append(rows, []string{"CI Pipeline", "준비 중... (잠시 후 xquare deploy 가능)"})
+			if appStatus == "not_deployed" {
+				if !ciReady {
+					rows = append(rows, []string{"Hint", "CI pipeline preparing... try xquare deploy in a minute"})
+				} else {
+					rows = append(rows, []string{"Hint", fmt.Sprintf("run: xquare deploy %s --watch", args[0])})
+				}
 			}
 
 			if lb, ok := status["lastBuild"].(map[string]any); ok && lb != nil {
@@ -259,15 +273,25 @@ func newCreateCmd() *cobra.Command {
 				return fmt.Errorf("invalid --build-type %q\n\nSupported types: gradle, nodejs, react, vite, go, rust, maven, django, flask, docker", buildType)
 			}
 
-			// Auto-detect repo from git remote if not specified
-			if repo == "" {
-				if detected := detectGitRepo(); detected != "" {
-					repo = detected
-					output.Info(fmt.Sprintf("detected repo: %s/%s", owner, repo))
-				} else {
-					return fmt.Errorf("--repo is required (e.g. --repo my-repo-name)\n\n  xquare app create %s --repo <github-repo-name>", appName)
+			// Auto-detect owner/repo from git remote if not specified
+			ownerChanged := cmd.Flags().Changed("owner")
+			if repo == "" || !ownerChanged {
+				detectedOwner, detectedRepo := detectGitOrigin()
+				if repo == "" {
+					if detectedRepo != "" {
+						repo = detectedRepo
+					} else {
+						return fmt.Errorf("--repo is required (e.g. --repo my-repo-name)\n\n  xquare app create %s --repo <github-repo-name>", appName)
+					}
+				}
+				if !ownerChanged && detectedOwner != "" {
+					owner = detectedOwner
 				}
 			}
+			if owner == "" {
+				return fmt.Errorf("--owner is required (e.g. --owner my-github-org)\n\n  xquare app create %s --owner <github-org>", appName)
+			}
+			output.Info(fmt.Sprintf("repo: %s/%s", owner, repo))
 
 			body := buildAppBody(appName, buildType, owner, repo, branch, port, routes, cmd)
 			if dryRun {
@@ -292,14 +316,14 @@ func newCreateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().String("build-type", "docker", "build type: gradle|nodejs|react|vite|go|rust|maven|django|flask|docker")
-	cmd.Flags().String("owner", "team-xquare", "GitHub owner")
+	cmd.Flags().String("owner", "", "GitHub owner (auto-detected from git remote)")
 	cmd.Flags().String("repo", "", "GitHub repository name")
 	cmd.Flags().String("branch", "main", "GitHub branch")
 	cmd.Flags().Int("port", 8080, "application port")
 	cmd.Flags().StringSlice("routes", []string{}, "HTTP routes (e.g. myapp.dsmhs.kr)")
 	cmd.Flags().String("java-version", "17", "Java version")
 	cmd.Flags().String("node-version", "20", "Node.js version")
-	cmd.Flags().String("go-version", "1.21", "Go version")
+	cmd.Flags().String("go-version", "1.23", "Go version")
 	cmd.Flags().String("python-version", "3.11", "Python version")
 	cmd.Flags().String("build-command", "", "build command override")
 	cmd.Flags().String("start-command", "", "start command")
@@ -355,6 +379,14 @@ func newUpdateCmd() *cobra.Command {
 			}
 			if cmd.Flags().Changed("build-type") {
 				buildType, _ := cmd.Flags().GetString("build-type")
+				validBuildTypes := map[string]bool{
+					"gradle": true, "nodejs": true, "react": true, "vite": true,
+					"go": true, "rust": true, "maven": true, "django": true,
+					"flask": true, "docker": true,
+				}
+				if !validBuildTypes[buildType] {
+					return fmt.Errorf("invalid --build-type %q\n\nSupported types: gradle, nodejs, react, vite, go, rust, maven, django, flask, docker", buildType)
+				}
 				body["build"] = buildBody(buildType, cmd)
 			}
 			if cmd.Flags().Changed("port") || cmd.Flags().Changed("routes") {
@@ -406,7 +438,7 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().StringSlice("routes", []string{}, "HTTP routes")
 	cmd.Flags().String("java-version", "17", "Java version")
 	cmd.Flags().String("node-version", "20", "Node.js version")
-	cmd.Flags().String("go-version", "1.21", "Go version")
+	cmd.Flags().String("go-version", "1.23", "Go version")
 	cmd.Flags().String("build-command", "", "build command")
 	cmd.Flags().String("start-command", "", "start command")
 	cmd.Flags().String("dist-path", "dist", "dist output path")
@@ -508,6 +540,21 @@ func buildBody(buildType string, cmd *cobra.Command) map[string]any {
 			sc = "gunicorn app:app"
 		}
 		return map[string]any{"flask": map[string]any{"pythonVersion": pv, "startCommand": sc}}
+	case "maven":
+		jv, _ := cmd.Flags().GetString("java-version")
+		bc, _ := cmd.Flags().GetString("build-command")
+		jo, _ := cmd.Flags().GetString("jar-output")
+		if bc == "" {
+			bc = "mvn package -DskipTests"
+		}
+		return map[string]any{"maven": map[string]any{"javaVersion": jv, "buildCommand": bc, "jarOutputPath": jo}}
+	case "rust":
+		bc, _ := cmd.Flags().GetString("build-command")
+		bn, _ := cmd.Flags().GetString("binary-name")
+		if bc == "" {
+			bc = "cargo build --release"
+		}
+		return map[string]any{"rust": map[string]any{"buildCommand": bc, "binaryName": bn}}
 	default:
 		df, _ := cmd.Flags().GetString("dockerfile")
 		ctx, _ := cmd.Flags().GetString("context")
@@ -515,27 +562,26 @@ func buildBody(buildType string, cmd *cobra.Command) map[string]any {
 	}
 }
 
-// detectGitRepo extracts the repository name from git remote origin URL.
-// Returns empty string if not in a git repo or no remote.
-func detectGitRepo() string {
+// detectGitOrigin extracts (owner, repo) from git remote origin URL.
+// Returns empty strings if not in a git repo or no remote.
+func detectGitOrigin() (owner, repo string) {
 	out, err := exec.Command("git", "remote", "get-url", "origin").Output()
 	if err != nil {
-		return ""
+		return "", ""
 	}
-	url := strings.TrimSpace(string(out))
+	rawURL := strings.TrimSpace(string(out))
 	// Strip credentials from HTTPS URLs (https://token@github.com/owner/repo.git)
-	if idx := strings.LastIndex(url, "@"); idx != -1 {
-		url = "https://" + url[idx+1:]
+	if idx := strings.LastIndex(rawURL, "@"); idx != -1 {
+		rawURL = "https://" + rawURL[idx+1:]
 	}
-	// Extract repo name from various URL formats:
-	// https://github.com/owner/repo.git  → repo
-	// git@github.com:owner/repo.git      → repo
-	url = strings.TrimSuffix(url, ".git")
-	parts := strings.Split(url, "/")
+	// Normalize git@github.com:owner/repo.git → owner/repo
+	rawURL = strings.TrimSuffix(rawURL, ".git")
+	rawURL = strings.Replace(rawURL, ":", "/", 1) // git@ format
+	parts := strings.Split(rawURL, "/")
 	if len(parts) >= 2 {
-		return parts[len(parts)-1]
+		return parts[len(parts)-2], parts[len(parts)-1]
 	}
-	return ""
+	return "", ""
 }
 
 func buildAppBody(name, buildType, owner, repo, branch string, port int, routes []string, cmd *cobra.Command) map[string]any {

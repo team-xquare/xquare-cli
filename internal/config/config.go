@@ -47,7 +47,10 @@ func LoadGlobal() (*GlobalConfig, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
-	if cfg.ServerURL == "" {
+	// Env var always takes precedence over config file
+	if v := os.Getenv("XQUARE_SERVER_URL"); v != "" {
+		cfg.ServerURL = v
+	} else if cfg.ServerURL == "" {
 		cfg.ServerURL = defaultServerURL()
 	}
 	return &cfg, nil

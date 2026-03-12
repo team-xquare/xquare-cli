@@ -52,7 +52,11 @@ func newDBConnectCmd() *cobra.Command {
 
 			addonType := fmt.Sprintf("%v", conn["type"])
 			tunnelHost := fmt.Sprintf("%v", conn["host"])
-			tunnelPort := int(conn["port"].(float64))
+			portF, portOK := conn["port"].(float64)
+			if !portOK {
+				return fmt.Errorf("addon %q is not ready yet\n\n  xquare addon list   # check provisioning status", addonName)
+			}
+			tunnelPort := int(portF)
 			password := fmt.Sprintf("%v", conn["password"])
 
 			if localPort == 0 {
@@ -111,7 +115,11 @@ func newDBTunnelCmd() *cobra.Command {
 			}
 
 			tunnelHost := fmt.Sprintf("%v", conn["host"])
-			tunnelPort := int(conn["port"].(float64))
+			portF, portOK := conn["port"].(float64)
+			if !portOK {
+				return fmt.Errorf("addon %q is not ready yet\n\n  xquare addon list   # check provisioning status", addonName)
+			}
+			tunnelPort := int(portF)
 			password := fmt.Sprintf("%v", conn["password"])
 			addonType := fmt.Sprintf("%v", conn["type"])
 
