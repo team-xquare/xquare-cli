@@ -719,6 +719,32 @@ BEFORE calling this tool you MUST:
 				}, nil)
 			})
 
+			s.AddTool(mcp.NewTool("get_dashboard_url",
+				mcp.WithDescription("Get the Grafana monitoring dashboard URL for an app or addon. Returns the URL to the project's observability dashboard."),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("name", mcp.Required(), mcp.Description("App or addon name")),
+				mcp.WithString("type", mcp.Description(`"app" (default) or "addon"`)),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project := req.GetString("project", "")
+				name := req.GetString("name", "")
+				kind := req.GetString("type", "app")
+				if project == "" || name == "" {
+					return mcp.NewToolResultError("project and name are required"), nil
+				}
+				var dashURL string
+				if kind == "addon" {
+					dashURL = fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/addon-%s", project, name)
+				} else {
+					dashURL = fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/app-%s", project, name)
+				}
+				return jsonResult(map[string]string{
+					"url":     dashURL,
+					"project": project,
+					"name":    name,
+					"type":    kind,
+				}, nil)
+			})
+
 			s.AddTool(mcp.NewTool("schema",
 				mcp.WithDescription("Return the full xquare CLI command schema with all constraints, valid values, and examples. Call this first to understand all available commands before doing anything else."),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

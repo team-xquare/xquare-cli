@@ -301,6 +301,14 @@ func appSchema() CommandSchema {
 					"xquare app tunnel my-api --print-url",
 				},
 			},
+			{
+				Command:     "app dashboard <app>",
+				Description: "Print the Grafana monitoring dashboard URL for an app. URL pattern: https://{project}-observability-dashboard.dsmhs.kr/d/app-{name}",
+				Args:        []ArgSchema{{Name: "app", Required: true}},
+				Examples: []string{
+					"xquare app dashboard my-api",
+				},
+			},
 		},
 	}
 }

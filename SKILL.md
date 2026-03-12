@@ -99,6 +99,20 @@ xquare app tunnel my-api                  # tunnel to app's service port
 xquare app tunnel my-api --port 9090      # specific port if multiple endpoints
 ```
 
+### Monitoring dashboards (Grafana)
+Each project has a dedicated Grafana instance. Dashboards exist for every app and addon.
+
+```bash
+xquare app dashboard my-api               # print Grafana dashboard URL for an app
+xquare addon status mydb                  # includes dashboard URL in output
+```
+
+URL patterns:
+```
+https://{project}-observability-dashboard.dsmhs.kr/d/app-{name}    # app
+https://{project}-observability-dashboard.dsmhs.kr/d/addon-{name}  # addon
+```
+
 ## In-Cluster DNS (app ↔ app, app ↔ addon)
 
 Apps and addons within the **same project** can communicate directly using the app/addon name as the hostname.
@@ -192,6 +206,7 @@ xquare mcp --vscode    # VS Code
 | `get_build_logs` | Build logs (latest or specific build ID) |
 | `get_logs` | Runtime logs |
 | `trigger` | Force re-run CI/CD (normally auto on git push) |
+| `get_dashboard_url` | Grafana dashboard URL for an app or addon |
 | `whoami` | Current authenticated user |
 | `schema` | Full CLI schema with all constraints |
 

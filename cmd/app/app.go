@@ -43,6 +43,7 @@ func NewAppCmd() *cobra.Command {
 		newUpdateCmd(),
 		newDeleteCmd(),
 		newAppTunnelCmd(),
+		newDashboardCmd(),
 	)
 	return cmd
 }
@@ -257,6 +258,8 @@ func newStatusCmd() *cobra.Command {
 					}
 				}
 			}
+			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/app-%s", project, args[0])
+			rows = append(rows, []string{"Dashboard", dashURL})
 			output.Table([]string{"FIELD", "VALUE"}, rows)
 			return nil
 		},
@@ -859,6 +862,28 @@ func parseEndpoints(strs []string) ([]map[string]any, error) {
 		endpoints = append(endpoints, ep)
 	}
 	return endpoints, nil
+}
+
+func newDashboardCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dashboard <app>",
+		Short: "Show Grafana dashboard URL for an app",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			appName := args[0]
+			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/app-%s", project, appName)
+			if api.IsJSON(cmd) {
+				return output.JSON(map[string]string{"url": dashURL, "app": appName, "project": project})
+			}
+			fmt.Fprintln(os.Stdout, dashURL)
+			output.Info("Tip: open the URL above in your browser to view metrics")
+			return nil
+		},
+	}
 }
 
 func buildAppBody(name, buildType, owner, repo, branch string, endpoints []map[string]any, cmd *cobra.Command) map[string]any {
