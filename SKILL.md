@@ -122,6 +122,19 @@ DB_PORT=5432
 
 > No namespace or full DNS suffix needed — just use the name as-is.
 
+### Project members
+```bash
+xquare project members                     # list members
+xquare project members add <username>      # invite by GitHub username
+xquare project members remove <username> --yes  # remove member
+```
+
+### Build history & logs
+```bash
+xquare logs my-api --build                 # latest build logs
+xquare logs my-api --build --build-id my-api-ci-abc12  # specific build
+```
+
 ## Dangerous Commands (require --yes)
 
 ```bash
@@ -150,6 +163,44 @@ xquare mcp --vscode    # VS Code
 
 # Then restart your IDE. xquare tools will appear automatically.
 ```
+
+### Available MCP tools
+
+| Tool | Description |
+|------|-------------|
+| `list_projects` | List accessible projects |
+| `get_project` | Project details (apps, addons, members) |
+| `create_project` | Create project |
+| `delete_project` ⚠️ | Delete project — requires `confirm="yes"` |
+| `list_apps` | List apps in project |
+| `get_app` | App config |
+| `get_app_status` | Runtime status (running/failed, instances, version) |
+| `create_app` | Create app |
+| `update_app` | Update app config |
+| `delete_app` ⚠️ | Delete app — requires `confirm="yes"` |
+| `get_env` | Get env vars |
+| `set_env` | Set env vars (merge) |
+| `delete_env` | Delete env keys |
+| `list_addons` | List addons |
+| `create_addon` | Provision addon |
+| `delete_addon` ⚠️ | Delete addon + data — requires `confirm="yes"` |
+| `get_addon_status` | Addon status & connection info |
+| `list_members` | List project members |
+| `add_member` | Add member by GitHub username |
+| `remove_member` ⚠️ | Remove member — requires `confirm="yes"` |
+| `list_builds` | Build history |
+| `get_build_logs` | Build logs (latest or specific build ID) |
+| `get_logs` | Runtime logs |
+| `trigger` | Force re-run CI/CD (normally auto on git push) |
+| `whoami` | Current authenticated user |
+| `schema` | Full CLI schema with all constraints |
+
+### ⚠️ Destructive MCP tools — safety protocol
+
+Tools marked ⚠️ require `confirm="yes"`. **Before setting confirm:**
+1. Tell the user exactly what will be permanently deleted
+2. Ask the user to explicitly confirm
+3. Only set `confirm="yes"` after receiving a clear "yes"
 
 ## Output Flags (all commands)
 
