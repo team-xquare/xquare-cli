@@ -8,7 +8,7 @@ DSM 학생팀을 위한 PaaS CLI.
 
 **macOS**
 ```sh
-brew install team-xquare/xquare/xquare
+brew install team-xquare/xquare/xquare-cli
 ```
 
 **Linux**
