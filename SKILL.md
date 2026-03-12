@@ -189,12 +189,20 @@ CI=true                  # auto-detected: disables spinners/colors/interactive p
 ## MCP Integration
 
 ```bash
-# Register xquare as MCP server in your AI tool
-xquare mcp --claude    # Claude Desktop
-xquare mcp --cursor    # Cursor
-xquare mcp --vscode    # VS Code
+# Register xquare as MCP server in your AI tool (run once, then restart the IDE/tool)
+xquare mcp --claude        # Claude Desktop
+xquare mcp --claude-code   # Claude Code CLI  (~/.claude.json)
+xquare mcp --cursor        # Cursor            (~/.cursor/mcp.json)
+xquare mcp --vscode        # VS Code Copilot   (mcp.json — uses "servers" key)
+xquare mcp --windsurf      # Windsurf          (~/.codeium/windsurf/mcp_config.json)
+xquare mcp --zed           # Zed               (~/.config/zed/settings.json)
+xquare mcp --continue      # Continue.dev      (~/.continue/config.yaml)
+xquare mcp --cline         # Cline             (VS Code globalStorage)
+xquare mcp --roo           # Roo Code          (VS Code globalStorage)
+xquare mcp --goose         # Goose (Block)     (~/.config/goose/config.yaml)
 
-# Then restart your IDE. xquare tools will appear automatically.
+# Multiple flags can be combined
+xquare mcp --claude-code --cursor --vscode
 ```
 
 ### Available MCP tools
