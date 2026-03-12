@@ -5,6 +5,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -128,10 +130,33 @@ func Upgrade(currentVersion string) error {
 		return fmt.Errorf("download URL %q is not from the official release path — upgrade aborted", downloadURL)
 	}
 
+	// Find the checksum asset. GoReleaser always produces checksums.txt.
+	var checksumURL string
+	for _, a := range rel.Assets {
+		if a.Name == "checksums.txt" {
+			checksumURL = a.BrowserDownloadURL
+			break
+		}
+	}
+
 	fmt.Fprintf(os.Stderr, "Downloading %s...\n", rel.TagName)
-	binData, err := downloadAndExtract(downloadURL, assetName)
+	archiveData, err := downloadRaw(downloadURL)
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
+	}
+
+	// Verify archive integrity before extracting.
+	if checksumURL != "" {
+		if err := verifyChecksum(archiveData, assetName, checksumURL); err != nil {
+			return fmt.Errorf("checksum verification failed: %w", err)
+		}
+	} else {
+		fmt.Fprintln(os.Stderr, "warning: no checksums.txt in release — skipping integrity check")
+	}
+
+	binData, err := extractArchive(archiveData, assetName)
+	if err != nil {
+		return fmt.Errorf("extract: %w", err)
 	}
 
 	execPath, err := os.Executable()
@@ -176,18 +201,58 @@ func archiveName(tag string) string {
 	return fmt.Sprintf("xquare_%s_%s_%s.tar.gz", ver, runtime.GOOS, runtime.GOARCH)
 }
 
-func downloadAndExtract(url, assetName string) ([]byte, error) {
+// downloadRaw fetches a URL and returns the raw bytes.
+func downloadRaw(url string) ([]byte, error) {
 	client := &http.Client{Timeout: 5 * time.Minute}
 	resp, err := client.Get(url) //nolint:noctx
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
 
-	if strings.HasSuffix(assetName, ".zip") {
-		return extractZip(resp.Body)
+// verifyChecksum fetches checksums.txt from checksumURL and confirms that the
+// SHA-256 of archiveData matches the expected hash for assetName.
+func verifyChecksum(archiveData []byte, assetName, checksumURL string) error {
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(checksumURL) //nolint:noctx
+	if err != nil {
+		return fmt.Errorf("download checksums.txt: %w", err)
 	}
-	return extractTarGz(resp.Body)
+	defer resp.Body.Close()
+	csData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read checksums.txt: %w", err)
+	}
+
+	// GoReleaser checksums.txt format: "<hex-sha256>  <filename>\n"
+	var expectedHash string
+	for _, line := range strings.Split(strings.TrimSpace(string(csData)), "\n") {
+		parts := strings.Fields(line)
+		if len(parts) == 2 && parts[1] == assetName {
+			expectedHash = strings.ToLower(parts[0])
+			break
+		}
+	}
+	if expectedHash == "" {
+		return fmt.Errorf("asset %q not found in checksums.txt", assetName)
+	}
+
+	sum := sha256.Sum256(archiveData)
+	actual := hex.EncodeToString(sum[:])
+	if actual != expectedHash {
+		return fmt.Errorf("SHA-256 mismatch: got %s, want %s", actual, expectedHash)
+	}
+	return nil
+}
+
+// extractArchive extracts the xquare binary from a downloaded archive.
+func extractArchive(data []byte, assetName string) ([]byte, error) {
+	if strings.HasSuffix(assetName, ".zip") {
+		return extractZip(bytes.NewReader(data))
+	}
+	return extractTarGz(bytes.NewReader(data))
 }
 
 func extractTarGz(r io.Reader) ([]byte, error) {
