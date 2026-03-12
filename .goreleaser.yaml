@@ -36,6 +36,20 @@ archives:
     files:
       - SKILL.md
 
+brews:
+  - name: xquare
+    repository:
+      owner: team-xquare
+      name: homebrew-xquare
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/team-xquare/xquare-cli"
+    description: "PaaS CLI for DSM student teams"
+    license: "MIT"
+    install: |
+      bin.install "xquare"
+    test: |
+      system "#{bin}/xquare version"
+
 checksum:
   name_template: "checksums.txt"
 
