@@ -15,6 +15,7 @@ import (
 	"github.com/team-xquare/xquare-cli/cmd/logs"
 	"github.com/team-xquare/xquare-cli/cmd/mcp"
 	"github.com/team-xquare/xquare-cli/cmd/project"
+	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/config"
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
@@ -23,6 +24,8 @@ var rootCmd = &cobra.Command{
 	Use:   "xquare",
 	Short: "xquare PaaS CLI — manage your projects, apps, and services",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Suppress usage on runtime errors (usage only makes sense for wrong flags/args)
+		cmd.SilenceUsage = true
 		jq, _ := cmd.Root().PersistentFlags().GetString("jq")
 		fields, _ := cmd.Root().PersistentFlags().GetStringSlice("fields")
 		output.SetGlobalFilters(jq, fields)
@@ -63,10 +66,26 @@ func newLinkCmd() *cobra.Command {
 		Short: "Link current directory to a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := config.SaveProject(&config.ProjectConfig{Project: args[0]}); err != nil {
+			projectName := args[0]
+			c := api.FromCmd(cmd)
+			projects, err := c.ListProjects(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("verify project: %w", err)
+			}
+			found := false
+			for _, p := range projects {
+				if p == projectName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("project %q not found\n\n  xquare project list       # see all projects\n  xquare project create %s  # create it", projectName, projectName)
+			}
+			if err := config.SaveProject(&config.ProjectConfig{Project: projectName}); err != nil {
 				return fmt.Errorf("save project config: %w", err)
 			}
-			output.Success("linked to project " + args[0])
+			output.Success("linked to project " + projectName)
 			return nil
 		},
 	}
