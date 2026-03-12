@@ -356,10 +356,10 @@ func newAddonTunnelCmd() *cobra.Command {
 			localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, addonName, tunnelPort)
 			proc := exec.Command(wstunnelBin, "client",
 				"-L", localArg,
-				"--http-upgrade-path-prefix", password,
 				"--log-lvl", "OFF",
 				fmt.Sprintf("wss://%s", tunnelHost),
 			)
+			proc.Env = append(os.Environ(), "WSTUNNEL_HTTP_UPGRADE_PATH_PREFIX="+password)
 			proc.Stdout = os.Stdout
 			proc.Stderr = os.Stderr
 			if err := proc.Start(); err != nil {
@@ -386,12 +386,14 @@ func resolveBinary() (binPath string, cleanup func(), err error) {
 
 func startTunnelProc(bin, tunnelHost, password, serviceName string, servicePort, localPort int) (*os.Process, error) {
 	localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, serviceName, servicePort)
+	// Pass password via environment variable instead of CLI arg to prevent
+	// exposure in process listings (ps aux / /proc/PID/cmdline).
 	cmd := exec.Command(bin, "client",
 		"-L", localArg,
-		"--http-upgrade-path-prefix", password,
 		"--log-lvl", "OFF",
 		fmt.Sprintf("wss://%s", tunnelHost),
 	)
+	cmd.Env = append(os.Environ(), "WSTUNNEL_HTTP_UPGRADE_PATH_PREFIX="+password)
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
