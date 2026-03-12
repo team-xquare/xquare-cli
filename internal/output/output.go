@@ -40,10 +40,15 @@ func IsTTY() bool {
 var globalJQ string
 var globalFields []string
 
-// SetGlobalFilters sets jq expression and fields for the current invocation
+// SetGlobalFilters sets jq expression and fields for the current invocation.
+// If either filter is set, JSON mode is automatically activated so that
+// --jq and --fields work without requiring an explicit --json flag.
 func SetGlobalFilters(jq string, fields []string) {
 	globalJQ = jq
 	globalFields = fields
+	if jq != "" || len(fields) > 0 {
+		jsonMode = true
+	}
 }
 
 // JSON prints v as JSON to stdout, applying global --jq and --fields filters

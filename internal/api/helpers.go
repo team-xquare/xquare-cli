@@ -38,11 +38,20 @@ func FromCmd(cmd *cobra.Command) *Client {
 	return New(cfg.ServerURL, cfg.Token)
 }
 
-// IsJSON returns true if --json flag is set on the command
+// IsJSON returns true if --json flag is set, or if --jq/--fields are set
+// (filters imply JSON mode so they can operate on structured data).
 func IsJSON(cmd *cobra.Command) bool {
 	v, _ := cmd.Flags().GetBool("json")
 	if !v {
 		v, _ = cmd.Root().PersistentFlags().GetBool("json")
+	}
+	if !v {
+		jq, _ := cmd.Root().PersistentFlags().GetString("jq")
+		v = jq != ""
+	}
+	if !v {
+		fields, _ := cmd.Root().PersistentFlags().GetStringSlice("fields")
+		v = len(fields) > 0
 	}
 	return v
 }
