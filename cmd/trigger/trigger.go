@@ -38,7 +38,7 @@ Use trigger only when:
 			}
 
 			c := api.FromCmd(cmd)
-			result, err := c.RedeployApp(cmd.Context(), project, appName)
+			result, err := c.TriggerApp(cmd.Context(), project, appName)
 			if err != nil {
 				return err
 			}

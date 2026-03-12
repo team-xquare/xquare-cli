@@ -25,8 +25,8 @@ import (
 
 func NewMCPCmd() *cobra.Command {
 	var (
-		installClaude, installCursor, installVSCode bool
-		installClaudeCode, installWindsurf, installZed bool
+		installClaude, installCursor, installVSCode             bool
+		installClaudeCode, installWindsurf, installZed          bool
 		installContinue, installCline, installRoo, installGoose bool
 	)
 
@@ -618,7 +618,7 @@ CI pipeline must be ready (ciReady=true in get_app_status) before calling trigge
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
-				data, err := client.RedeployApp(ctx, project, app)
+				data, err := client.TriggerApp(ctx, project, app)
 				return jsonResult(data, err)
 			})
 
