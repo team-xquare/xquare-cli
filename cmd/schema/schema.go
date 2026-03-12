@@ -293,10 +293,12 @@ func appSchema() CommandSchema {
 				Flags: []FlagSchema{
 					{Name: "port", Type: "int", Desc: "target app port (required if multiple endpoints)"},
 					{Name: "local-port", Type: "int", Desc: "local port to bind (defaults to service port)"},
+					{Name: "print-url", Type: "bool", Desc: "print tunnel URL and exit (non-interactive)"},
 				},
 				Examples: []string{
 					"xquare app tunnel my-api",
 					"xquare app tunnel my-api --port 9090",
+					"xquare app tunnel my-api --print-url",
 				},
 			},
 		},

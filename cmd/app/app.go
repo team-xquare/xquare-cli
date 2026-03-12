@@ -655,6 +655,7 @@ func detectGitOrigin() (owner, repo string) {
 func newAppTunnelCmd() *cobra.Command {
 	var localPort int
 	var targetPort int
+	var printURL bool
 
 	cmd := &cobra.Command{
 		Use:   "tunnel <app>",
@@ -719,6 +720,11 @@ func newAppTunnelCmd() *cobra.Command {
 				localPort = tunnelPort
 			}
 
+			if printURL {
+				fmt.Fprintf(os.Stdout, "http://127.0.0.1:%d\n", localPort)
+				return nil
+			}
+
 			wstunnelBin, cleanupBin, appTunnelErr := appResolveBinary()
 			if cleanupBin != nil {
 				defer cleanupBin()
@@ -757,6 +763,7 @@ func newAppTunnelCmd() *cobra.Command {
 	}
 	cmd.Flags().IntVar(&localPort, "local-port", 0, "local port (defaults to service port)")
 	cmd.Flags().IntVar(&targetPort, "port", 0, "app port to tunnel (required if multiple ports)")
+	cmd.Flags().BoolVar(&printURL, "print-url", false, "print tunnel URL and exit (non-interactive)")
 	return cmd
 }
 
