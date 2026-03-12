@@ -262,6 +262,9 @@ func newEnvPushCmd() *cobra.Command {
 					continue
 				}
 				k := strings.TrimSpace(parts[0])
+				if k == "" {
+					continue
+				}
 				v := strings.TrimSpace(parts[1])
 				// unquote if quoted
 				if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
