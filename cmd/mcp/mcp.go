@@ -164,7 +164,6 @@ func NewMCPCmd() *cobra.Command {
 				mcp.WithDescription("Trigger re-deploy with latest commit"),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
-				mcp.WithString("github_token", mcp.Required(), mcp.Description("GitHub personal access token")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				project, err := req.RequireString("project")
 				if err != nil {
@@ -174,11 +173,7 @@ func NewMCPCmd() *cobra.Command {
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
-				token, err := req.RequireString("github_token")
-				if err != nil {
-					return mcp.NewToolResultError(err.Error()), nil
-				}
-				data, err := client.RedeployApp(ctx, project, app, token)
+				data, err := client.RedeployApp(ctx, project, app)
 				return jsonResult(data, err)
 			})
 
