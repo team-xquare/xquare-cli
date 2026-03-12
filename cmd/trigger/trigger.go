@@ -1,4 +1,4 @@
-package deploy
+package trigger
 
 import (
 	"fmt"
@@ -10,13 +10,13 @@ import (
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
 
-func NewDeployCmd() *cobra.Command {
+func NewTriggerCmd() *cobra.Command {
 	var watch bool
 	var dryRun bool
 
 	cmd := &cobra.Command{
-		Use:   "deploy <app>",
-		Short: "Trigger a re-deploy with the latest commit",
+		Use:   "trigger <app>",
+		Short: "Manually trigger CI/CD for the latest commit",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			project, err := api.RequireProject(cmd)
@@ -26,7 +26,7 @@ func NewDeployCmd() *cobra.Command {
 			appName := args[0]
 
 			if dryRun {
-				output.Info(fmt.Sprintf("[dry-run] would redeploy %s/%s", project, appName))
+				output.Info(fmt.Sprintf("[dry-run] would trigger %s/%s", project, appName))
 				return nil
 			}
 
@@ -44,7 +44,7 @@ func NewDeployCmd() *cobra.Command {
 				return watchFull(cmd, c, project, appName, buildID)
 			}
 			output.Info(fmt.Sprintf("  xquare logs %s --build          # 빌드 로그 실시간 확인", appName))
-			output.Info(fmt.Sprintf("  xquare deploy %s --watch        # 배포 완료까지 대기", appName))
+			output.Info(fmt.Sprintf("  xquare trigger %s --watch        # 배포 완료까지 대기", appName))
 			return nil
 		},
 	}
@@ -62,6 +62,7 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 
 	phase := "building"
 	lastMsg := ""
+	failCount := 0
 
 	printOnce := func(msg string) {
 		if msg != lastMsg {
@@ -128,7 +129,13 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 					output.Success(fmt.Sprintf("배포 완료  (%s/%s running)", running, desired))
 					return nil
 				case "failed":
-					return fmt.Errorf("배포 실패 — Pod가 시작되지 않음\n\n  xquare logs %s", app)
+					failCount++
+					if failCount >= 3 {
+						return fmt.Errorf("배포 실패 — Pod가 시작되지 않음\n\n  xquare logs %s", app)
+					}
+					continue
+				default:
+					failCount = 0
 				}
 			}
 		}

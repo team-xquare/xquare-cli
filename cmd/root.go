@@ -10,12 +10,12 @@ import (
 	"github.com/team-xquare/xquare-cli/cmd/addon"
 	"github.com/team-xquare/xquare-cli/cmd/app"
 	"github.com/team-xquare/xquare-cli/cmd/auth"
-	"github.com/team-xquare/xquare-cli/cmd/deploy"
 	"github.com/team-xquare/xquare-cli/cmd/env"
 	"github.com/team-xquare/xquare-cli/cmd/logs"
 	"github.com/team-xquare/xquare-cli/cmd/mcp"
 	"github.com/team-xquare/xquare-cli/cmd/project"
 	"github.com/team-xquare/xquare-cli/cmd/schema"
+	"github.com/team-xquare/xquare-cli/cmd/trigger"
 	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/config"
 	"github.com/team-xquare/xquare-cli/internal/output"
@@ -68,7 +68,7 @@ func init() {
 		auth.NewLoginCmd(), // keep top-level `xquare login` shortcut
 		project.NewProjectCmd(),
 		app.NewAppCmd(),
-		deploy.NewDeployCmd(),
+		trigger.NewTriggerCmd(),
 		env.NewEnvCmd(),
 		addon.NewAddonCmd(),
 		logs.NewLogsCmd(),

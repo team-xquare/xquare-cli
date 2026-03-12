@@ -62,10 +62,10 @@ xquare app create my-api \
 
 # 2. Wait ~2 minutes for CI infrastructure to initialize
 # 3. Deploy
-xquare deploy my-api
+xquare trigger my-api
 
 # 4. Watch deployment
-xquare deploy my-api --watch
+xquare trigger my-api --watch
 # or stream logs
 xquare logs my-api --build
 xquare logs my-api -f

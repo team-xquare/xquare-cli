@@ -31,7 +31,7 @@ iwr -useb https://raw.githubusercontent.com/team-xquare/xquare-cli/main/install.
 xquare login                  # GitHub 인증
 xquare link <project>         # 현재 디렉토리에 프로젝트 연결
 xquare app list               # 앱 목록
-xquare deploy <app>           # 배포
+xquare trigger <app>          # CI/CD 수동 트리거
 ```
 
 ---
