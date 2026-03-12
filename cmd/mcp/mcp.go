@@ -15,6 +15,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/team-xquare/xquare-cli/cmd/schema"
 	"github.com/team-xquare/xquare-cli/internal/api"
@@ -23,19 +24,45 @@ import (
 )
 
 func NewMCPCmd() *cobra.Command {
-	var installClaude, installCursor, installVSCode bool
+	var (
+		installClaude, installCursor, installVSCode bool
+		installClaudeCode, installWindsurf, installZed bool
+		installContinue, installCline, installRoo, installGoose bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Start MCP server (for AI agent integration)",
 		Long: `Start xquare as an MCP (Model Context Protocol) server.
 
-Use --claude, --cursor, or --vscode to register xquare as an MCP server
-in your AI tool instead of starting the server directly.`,
+Use a registration flag to add xquare as an MCP server in your AI tool:
+  --claude        Claude Desktop
+  --claude-code   Claude Code CLI
+  --cursor        Cursor
+  --vscode        VS Code (GitHub Copilot)
+  --windsurf      Windsurf
+  --zed           Zed
+  --continue      Continue.dev
+  --cline         Cline (VS Code extension)
+  --roo           Roo Code (VS Code extension)
+  --goose         Goose (Block)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Handle IDE registration flags
-			if installClaude || installCursor || installVSCode {
-				return registerMCP(installClaude, installCursor, installVSCode)
+			if installClaude || installCursor || installVSCode ||
+				installClaudeCode || installWindsurf || installZed ||
+				installContinue || installCline || installRoo || installGoose {
+				return registerMCP(registerOpts{
+					claude:      installClaude,
+					cursor:      installCursor,
+					vscode:      installVSCode,
+					claudeCode:  installClaudeCode,
+					windsurf:    installWindsurf,
+					zed:         installZed,
+					continueApp: installContinue,
+					cline:       installCline,
+					roo:         installRoo,
+					goose:       installGoose,
+				})
 			}
 
 			cfg, err := config.LoadGlobal()
@@ -815,60 +842,134 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 		},
 	}
 
-	cmd.Flags().BoolVar(&installClaude, "claude", false, "register xquare MCP server in Claude Desktop config")
-	cmd.Flags().BoolVar(&installCursor, "cursor", false, "register xquare MCP server in Cursor config")
-	cmd.Flags().BoolVar(&installVSCode, "vscode", false, "register xquare MCP server in VS Code config")
+	cmd.Flags().BoolVar(&installClaude, "claude", false, "register in Claude Desktop config")
+	cmd.Flags().BoolVar(&installCursor, "cursor", false, "register in Cursor config")
+	cmd.Flags().BoolVar(&installVSCode, "vscode", false, "register in VS Code (Copilot) config")
+	cmd.Flags().BoolVar(&installClaudeCode, "claude-code", false, "register in Claude Code CLI config (~/.claude.json)")
+	cmd.Flags().BoolVar(&installWindsurf, "windsurf", false, "register in Windsurf config")
+	cmd.Flags().BoolVar(&installZed, "zed", false, "register in Zed editor config")
+	cmd.Flags().BoolVar(&installContinue, "continue", false, "register in Continue.dev config")
+	cmd.Flags().BoolVar(&installCline, "cline", false, "register in Cline (VS Code extension) config")
+	cmd.Flags().BoolVar(&installRoo, "roo", false, "register in Roo Code (VS Code extension) config")
+	cmd.Flags().BoolVar(&installGoose, "goose", false, "register in Goose (Block) config")
+
 	return cmd
 }
 
-// registerMCP installs xquare as an MCP server in the specified IDE configs.
-func registerMCP(claude, cursor, vscode bool) error {
-	// Resolve xquare binary path
+type registerOpts struct {
+	claude      bool
+	cursor      bool
+	vscode      bool
+	claudeCode  bool
+	windsurf    bool
+	zed         bool
+	continueApp bool
+	cline       bool
+	roo         bool
+	goose       bool
+}
+
+// registerMCP installs xquare as an MCP server in the specified IDE/tool configs.
+func registerMCP(opts registerOpts) error {
 	xquarePath, err := exec.LookPath("xquare")
 	if err != nil {
-		// Fall back to current executable
 		xquarePath, _ = os.Executable()
 	}
 
-	mcpEntry := map[string]any{
+	// Standard entry (mcpServers format)
+	stdEntry := map[string]any{
 		"command": xquarePath,
 		"args":    []string{"mcp"},
 	}
-
-	var registered []string
-
-	if claude {
-		if err := writeMCPConfig(claudeConfigPath(), mcpEntry); err != nil {
-			return fmt.Errorf("claude: %w", err)
-		}
-		registered = append(registered, "Claude Desktop")
+	// Claude Code entry adds type field
+	claudeCodeEntry := map[string]any{
+		"type":    "stdio",
+		"command": xquarePath,
+		"args":    []string{"mcp"},
 	}
-	if cursor {
-		if err := writeMCPConfig(cursorConfigPath(), mcpEntry); err != nil {
-			return fmt.Errorf("cursor: %w", err)
-		}
-		registered = append(registered, "Cursor")
-	}
-	if vscode {
-		if err := writeMCPConfig(vscodeConfigPath(), mcpEntry); err != nil {
-			return fmt.Errorf("vscode: %w", err)
-		}
-		registered = append(registered, "VS Code")
+	// Cline/Roo entry adds disabled + alwaysAllow
+	clineEntry := map[string]any{
+		"command":     xquarePath,
+		"args":        []string{"mcp"},
+		"disabled":    false,
+		"alwaysAllow": []string{},
 	}
 
-	for _, ide := range registered {
-		output.Success(fmt.Sprintf("registered xquare MCP server in %s", ide))
+	type registration struct {
+		name string
+		fn   func() error
 	}
-	output.Info("restart your IDE to activate")
+
+	var regs []registration
+
+	if opts.claude {
+		regs = append(regs, registration{"Claude Desktop", func() error {
+			return writeMCPServersConfig(claudeDesktopConfigPath(), stdEntry)
+		}})
+	}
+	if opts.claudeCode {
+		regs = append(regs, registration{"Claude Code CLI", func() error {
+			return writeMCPServersConfig(claudeCodeConfigPath(), claudeCodeEntry)
+		}})
+	}
+	if opts.cursor {
+		regs = append(regs, registration{"Cursor", func() error {
+			return writeMCPServersConfig(cursorConfigPath(), stdEntry)
+		}})
+	}
+	if opts.vscode {
+		regs = append(regs, registration{"VS Code", func() error {
+			return writeVSCodeConfig(vscodeConfigPath(), stdEntry)
+		}})
+	}
+	if opts.windsurf {
+		regs = append(regs, registration{"Windsurf", func() error {
+			return writeMCPServersConfig(windsurfConfigPath(), stdEntry)
+		}})
+	}
+	if opts.zed {
+		regs = append(regs, registration{"Zed", func() error {
+			return writeZedConfig(zedConfigPath(), xquarePath)
+		}})
+	}
+	if opts.continueApp {
+		regs = append(regs, registration{"Continue.dev", func() error {
+			return writeContinueConfig(continueConfigPath(), xquarePath)
+		}})
+	}
+	if opts.cline {
+		regs = append(regs, registration{"Cline", func() error {
+			return writeMCPServersConfig(clineConfigPath(), clineEntry)
+		}})
+	}
+	if opts.roo {
+		regs = append(regs, registration{"Roo Code", func() error {
+			return writeMCPServersConfig(rooConfigPath(), clineEntry)
+		}})
+	}
+	if opts.goose {
+		regs = append(regs, registration{"Goose", func() error {
+			return writeGooseConfig(gooseConfigPath(), xquarePath)
+		}})
+	}
+
+	for _, r := range regs {
+		if err := r.fn(); err != nil {
+			return fmt.Errorf("%s: %w", r.name, err)
+		}
+		output.Success(fmt.Sprintf("registered xquare MCP server in %s", r.name))
+	}
+	if len(regs) > 0 {
+		output.Info("restart your IDE/tool to activate")
+	}
 	return nil
 }
 
-// writeMCPConfig merges the xquare MCP entry into the IDE's config JSON file.
-func writeMCPConfig(configPath string, entry map[string]any) error {
+// writeMCPServersConfig merges entry under "mcpServers" key in a JSON config file.
+func writeMCPServersConfig(configPath string, entry map[string]any) error {
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 		return err
 	}
-
 	var cfg map[string]any
 	if data, err := os.ReadFile(configPath); err == nil {
 		_ = json.Unmarshal(data, &cfg)
@@ -876,14 +977,12 @@ func writeMCPConfig(configPath string, entry map[string]any) error {
 	if cfg == nil {
 		cfg = map[string]any{}
 	}
-
 	servers, _ := cfg["mcpServers"].(map[string]any)
 	if servers == nil {
 		servers = map[string]any{}
 	}
 	servers["xquare"] = entry
 	cfg["mcpServers"] = servers
-
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
@@ -891,14 +990,148 @@ func writeMCPConfig(configPath string, entry map[string]any) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
-func claudeConfigPath() string {
+// writeVSCodeConfig merges entry under "servers" key (VS Code uses "servers" not "mcpServers").
+func writeVSCodeConfig(configPath string, entry map[string]any) error {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return err
+	}
+	var cfg map[string]any
+	if data, err := os.ReadFile(configPath); err == nil {
+		_ = json.Unmarshal(data, &cfg)
+	}
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+	servers, _ := cfg["servers"].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+	}
+	servers["xquare"] = entry
+	cfg["servers"] = servers
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, data, 0644)
+}
+
+// writeZedConfig merges into Zed's settings.json under "context_servers" with its unique nested structure.
+func writeZedConfig(configPath string, xquarePath string) error {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return err
+	}
+	var cfg map[string]any
+	if data, err := os.ReadFile(configPath); err == nil {
+		_ = json.Unmarshal(data, &cfg)
+	}
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+	servers, _ := cfg["context_servers"].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+	}
+	servers["xquare"] = map[string]any{
+		"command": map[string]any{
+			"path": xquarePath,
+			"args": []string{"mcp"},
+			"env":  map[string]any{},
+		},
+		"settings": map[string]any{},
+	}
+	cfg["context_servers"] = servers
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, data, 0644)
+}
+
+// writeContinueConfig adds xquare to Continue.dev's config.yaml under mcpServers array.
+func writeContinueConfig(configPath string, xquarePath string) error {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return err
+	}
+
+	type mcpServer struct {
+		Name    string   `yaml:"name"`
+		Command string   `yaml:"command"`
+		Args    []string `yaml:"args"`
+	}
+	type continueConfig struct {
+		MCPServers []mcpServer            `yaml:"mcpServers,omitempty"`
+		Rest       map[string]interface{} `yaml:",inline"`
+	}
+
+	var cfg continueConfig
+	if data, err := os.ReadFile(configPath); err == nil {
+		_ = yaml.Unmarshal(data, &cfg)
+	}
+
+	// Remove existing xquare entry if present
+	filtered := cfg.MCPServers[:0]
+	for _, s := range cfg.MCPServers {
+		if s.Name != "xquare" {
+			filtered = append(filtered, s)
+		}
+	}
+	cfg.MCPServers = append(filtered, mcpServer{
+		Name:    "xquare",
+		Command: xquarePath,
+		Args:    []string{"mcp"},
+	})
+
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, data, 0644)
+}
+
+// writeGooseConfig adds xquare to Goose's config.yaml under extensions.
+func writeGooseConfig(configPath string, xquarePath string) error {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return err
+	}
+
+	var cfg map[string]any
+	if data, err := os.ReadFile(configPath); err == nil {
+		_ = yaml.Unmarshal(data, &cfg)
+	}
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+
+	exts, _ := cfg["extensions"].(map[string]any)
+	if exts == nil {
+		exts = map[string]any{}
+	}
+	exts["xquare"] = map[string]any{
+		"name":    "xquare",
+		"cmd":     xquarePath,
+		"args":    []string{"mcp"},
+		"enabled": true,
+		"type":    "stdio",
+		"timeout": 300,
+		"envs":    map[string]any{},
+	}
+	cfg["extensions"] = exts
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, data, 0644)
+}
+
+func claudeDesktopConfigPath() string {
 	home, _ := os.UserHomeDir()
 	switch runtime.GOOS {
 	case "darwin":
 		return filepath.Join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
 	case "windows":
 		return filepath.Join(os.Getenv("APPDATA"), "Claude", "claude_desktop_config.json")
-	default: // linux
+	default:
 		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 			return filepath.Join(xdg, "Claude", "claude_desktop_config.json")
 		}
@@ -906,18 +1139,18 @@ func claudeConfigPath() string {
 	}
 }
 
+func claudeCodeConfigPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".claude.json")
+}
+
 func cursorConfigPath() string {
 	home, _ := os.UserHomeDir()
 	switch runtime.GOOS {
-	case "darwin":
-		return filepath.Join(home, "Library", "Application Support", "Cursor", "User", "globalStorage", "cursor.mcp", "settings.json")
-	case "windows":
-		return filepath.Join(os.Getenv("APPDATA"), "Cursor", "User", "globalStorage", "cursor.mcp", "settings.json")
+	case "darwin", "windows":
+		return filepath.Join(home, ".cursor", "mcp.json")
 	default:
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			return filepath.Join(xdg, "Cursor", "User", "globalStorage", "cursor.mcp", "settings.json")
-		}
-		return filepath.Join(home, ".config", "Cursor", "User", "globalStorage", "cursor.mcp", "settings.json")
+		return filepath.Join(home, ".cursor", "mcp.json")
 	}
 }
 
@@ -933,6 +1166,74 @@ func vscodeConfigPath() string {
 			return filepath.Join(xdg, "Code", "User", "mcp.json")
 		}
 		return filepath.Join(home, ".config", "Code", "User", "mcp.json")
+	}
+}
+
+func windsurfConfigPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".codeium", "windsurf", "mcp_config.json")
+}
+
+func zedConfigPath() string {
+	home, _ := os.UserHomeDir()
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "Zed", "settings.json")
+	case "windows":
+		return filepath.Join(os.Getenv("APPDATA"), "Zed", "settings.json")
+	default:
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			return filepath.Join(xdg, "zed", "settings.json")
+		}
+		return filepath.Join(home, ".config", "zed", "settings.json")
+	}
+}
+
+func continueConfigPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".continue", "config.yaml")
+}
+
+func clineConfigPath() string {
+	home, _ := os.UserHomeDir()
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings", "cline_mcp_settings.json")
+	case "windows":
+		return filepath.Join(os.Getenv("APPDATA"), "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings", "cline_mcp_settings.json")
+	default:
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			return filepath.Join(xdg, "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings", "cline_mcp_settings.json")
+		}
+		return filepath.Join(home, ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings", "cline_mcp_settings.json")
+	}
+}
+
+func rooConfigPath() string {
+	home, _ := os.UserHomeDir()
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "Code", "User", "globalStorage", "rooveterinaryinc.roo-cline", "settings", "cline_mcp_settings.json")
+	case "windows":
+		return filepath.Join(os.Getenv("APPDATA"), "Code", "User", "globalStorage", "rooveterinaryinc.roo-cline", "settings", "cline_mcp_settings.json")
+	default:
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			return filepath.Join(xdg, "Code", "User", "globalStorage", "rooveterinaryinc.roo-cline", "settings", "cline_mcp_settings.json")
+		}
+		return filepath.Join(home, ".config", "Code", "User", "globalStorage", "rooveterinaryinc.roo-cline", "settings", "cline_mcp_settings.json")
+	}
+}
+
+func gooseConfigPath() string {
+	home, _ := os.UserHomeDir()
+	switch runtime.GOOS {
+	case "windows":
+		return filepath.Join(os.Getenv("APPDATA"), "Block", "goose", "config", "config.yaml")
+	default:
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			return filepath.Join(xdg, "goose", "config.yaml")
+		}
+		return filepath.Join(home, ".config", "goose", "config.yaml")
 	}
 }
 
