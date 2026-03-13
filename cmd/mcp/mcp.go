@@ -801,16 +801,26 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 			})
 
 			s.AddTool(mcp.NewTool("get_dashboard_url",
-				mcp.WithDescription("Get the Grafana monitoring dashboard URL for an app or addon. Returns the URL to the project's observability dashboard."),
+				mcp.WithDescription("Get the Grafana monitoring dashboard URL and login credentials for a project, app, or addon. Use type='project' to get the project-level Grafana login info (URL + username + password). Use type='app' or type='addon' with a name for a specific dashboard URL."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
-				mcp.WithString("name", mcp.Required(), mcp.Description("App or addon name")),
-				mcp.WithString("type", mcp.Description(`"app" (default) or "addon"`)),
+				mcp.WithString("name", mcp.Description("App or addon name (not required when type is 'project')")),
+				mcp.WithString("type", mcp.Description(`"project" (default) for project Grafana credentials, "app" for app dashboard URL, "addon" for addon dashboard URL`)),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				project := req.GetString("project", "")
 				name := req.GetString("name", "")
-				kind := req.GetString("type", "app")
-				if project == "" || name == "" {
-					return mcp.NewToolResultError("project and name are required"), nil
+				kind := req.GetString("type", "project")
+				if project == "" {
+					return mcp.NewToolResultError("project is required"), nil
+				}
+				if kind == "project" {
+					info, err := client.GetDashboard(ctx, project)
+					if err != nil {
+						return mcp.NewToolResultError(err.Error()), nil
+					}
+					return jsonResult(info, nil)
+				}
+				if name == "" {
+					return mcp.NewToolResultError("name is required for type app or addon"), nil
 				}
 				var dashURL string
 				if kind == "addon" {

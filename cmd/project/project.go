@@ -31,6 +31,7 @@ func NewProjectCmd() *cobra.Command {
 		newCreateCmd(),
 		newDeleteCmd(),
 		newMembersCmd(),
+		newProjectDashboardCmd(),
 	)
 	return cmd
 }
@@ -251,6 +252,37 @@ func newMembersAddCmd() *cobra.Command {
 				return err
 			}
 			output.Success(fmt.Sprintf("added %s to project %s", args[0], project))
+			return nil
+		},
+	}
+}
+
+func newProjectDashboardCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dashboard",
+		Short: "Show Grafana dashboard URL and login credentials",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := api.FromCmd(cmd)
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			info, err := c.GetDashboard(cmd.Context(), project)
+			if err != nil {
+				return err
+			}
+			if api.IsJSON(cmd) {
+				return output.JSON(info)
+			}
+			password := "(provisioning...)"
+			if info.Password != nil {
+				password = *info.Password
+			}
+			output.Table([]string{"FIELD", "VALUE"}, [][]string{
+				{"URL", info.URL},
+				{"Username", info.Username},
+				{"Password", password},
+			})
 			return nil
 		},
 	}

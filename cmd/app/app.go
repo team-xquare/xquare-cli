@@ -887,25 +887,53 @@ func validateRouteHost(host string) error {
 }
 
 func newDashboardCmd() *cobra.Command {
-	return &cobra.Command{
+	var withCreds bool
+	cmd := &cobra.Command{
 		Use:   "dashboard <app>",
 		Short: "Show Grafana dashboard URL for an app",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			c := api.FromCmd(cmd)
 			project, err := api.RequireProject(cmd)
 			if err != nil {
 				return err
 			}
 			appName := args[0]
 			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/app-%s", project, appName)
+
+			if withCreds {
+				info, err := c.GetDashboard(cmd.Context(), project)
+				if err != nil {
+					return err
+				}
+				password := "(provisioning...)"
+				if info.Password != nil {
+					password = *info.Password
+				}
+				if api.IsJSON(cmd) {
+					return output.JSON(map[string]any{
+						"url": dashURL, "app": appName, "project": project,
+						"username": info.Username, "password": password,
+					})
+				}
+				output.Table([]string{"FIELD", "VALUE"}, [][]string{
+					{"Dashboard URL", dashURL},
+					{"Username", info.Username},
+					{"Password", password},
+				})
+				return nil
+			}
+
 			if api.IsJSON(cmd) {
 				return output.JSON(map[string]string{"url": dashURL, "app": appName, "project": project})
 			}
 			fmt.Fprintln(os.Stdout, dashURL)
-			output.Info("Tip: open the URL above in your browser to view metrics")
+			output.Info("Tip: use --credentials to also show Grafana login info")
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&withCreds, "credentials", false, "also show Grafana username and password")
+	return cmd
 }
 
 func buildAppBody(name, buildType, owner, repo, branch string, endpoints []map[string]any, cmd *cobra.Command) map[string]any {
