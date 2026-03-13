@@ -60,20 +60,26 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		// Try to parse not_deployed error
+	if resp.StatusCode >= 400 {
 		var e struct {
 			Error string `json:"error"`
 			Code  string `json:"code"`
 		}
 		_ = json.NewDecoder(resp.Body).Decode(&e)
-		if e.Code == "not_deployed" {
+		switch e.Code {
+		case "not_deployed":
 			return fmt.Errorf("%s\n\n  xquare trigger %s --watch   # 배포 시작", e.Error, appName)
+		case "start_timeout":
+			return fmt.Errorf("%s\n\n  xquare app status %s   # 상태 확인\n  xquare builds %s        # 빌드 로그 확인", e.Error, appName, appName)
+		default:
+			if e.Error != "" {
+				return fmt.Errorf("%s", e.Error)
+			}
+			if resp.StatusCode == 404 {
+				return fmt.Errorf("app %q not found in project %q\n\n  xquare app list   # list apps in this project", appName, project)
+			}
+			return fmt.Errorf("로그를 가져올 수 없습니다 (status %d) — 잠시 후 다시 시도하세요", resp.StatusCode)
 		}
-		return fmt.Errorf("app %q not found in project %q\n\n  xquare app list   # list apps in this project", appName, project)
-	}
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("server error: %d", resp.StatusCode)
 	}
 
 	isJSON := api.IsJSON(cmd)

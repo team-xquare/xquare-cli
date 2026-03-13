@@ -28,6 +28,7 @@ func NewMCPCmd() *cobra.Command {
 		installClaude, installCursor, installVSCode             bool
 		installClaudeCode, installWindsurf, installZed          bool
 		installContinue, installCline, installRoo, installGoose bool
+		installOpenCode                                         bool
 	)
 
 	cmd := &cobra.Command{
@@ -45,12 +46,13 @@ Use a registration flag to add xquare as an MCP server in your AI tool:
   --continue      Continue.dev
   --cline         Cline (VS Code extension)
   --roo           Roo Code (VS Code extension)
-  --goose         Goose (Block)`,
+  --goose         Goose (Block)
+  --opencode      OpenCode`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Handle IDE registration flags
 			if installClaude || installCursor || installVSCode ||
 				installClaudeCode || installWindsurf || installZed ||
-				installContinue || installCline || installRoo || installGoose {
+				installContinue || installCline || installRoo || installGoose || installOpenCode {
 				return registerMCP(registerOpts{
 					claude:      installClaude,
 					cursor:      installCursor,
@@ -62,6 +64,7 @@ Use a registration flag to add xquare as an MCP server in your AI tool:
 					cline:       installCline,
 					roo:         installRoo,
 					goose:       installGoose,
+					openCode:    installOpenCode,
 				})
 			}
 
@@ -862,6 +865,7 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 	cmd.Flags().BoolVar(&installCline, "cline", false, "register in Cline (VS Code extension) config")
 	cmd.Flags().BoolVar(&installRoo, "roo", false, "register in Roo Code (VS Code extension) config")
 	cmd.Flags().BoolVar(&installGoose, "goose", false, "register in Goose (Block) config")
+	cmd.Flags().BoolVar(&installOpenCode, "opencode", false, "register in OpenCode config (~/.config/opencode/opencode.json)")
 
 	return cmd
 }
@@ -877,6 +881,7 @@ type registerOpts struct {
 	cline       bool
 	roo         bool
 	goose       bool
+	openCode    bool
 }
 
 // registerMCP installs xquare as an MCP server in the specified IDE/tool configs.
@@ -960,6 +965,11 @@ func registerMCP(opts registerOpts) error {
 	if opts.goose {
 		regs = append(regs, registration{"Goose", func() error {
 			return writeGooseConfig(gooseConfigPath(), xquarePath)
+		}})
+	}
+	if opts.openCode {
+		regs = append(regs, registration{"OpenCode", func() error {
+			return writeOpenCodeConfig(openCodeConfigPath(), xquarePath)
 		}})
 	}
 
@@ -1245,6 +1255,43 @@ func gooseConfigPath() string {
 		}
 		return filepath.Join(home, ".config", "goose", "config.yaml")
 	}
+}
+
+func openCodeConfigPath() string {
+	home, _ := os.UserHomeDir()
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "opencode", "opencode.json")
+	}
+	return filepath.Join(home, ".config", "opencode", "opencode.json")
+}
+
+// writeOpenCodeConfig merges entry under "mcp" key in opencode.json.
+// OpenCode uses { "mcp": { "name": { "type": "local", "command": ["cmd", "arg"] } } }
+func writeOpenCodeConfig(configPath, xquarePath string) error {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return err
+	}
+	var cfg map[string]any
+	if data, err := os.ReadFile(configPath); err == nil {
+		_ = json.Unmarshal(data, &cfg)
+	}
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+	mcp, _ := cfg["mcp"].(map[string]any)
+	if mcp == nil {
+		mcp = map[string]any{}
+	}
+	mcp["xquare"] = map[string]any{
+		"type":    "local",
+		"command": []string{xquarePath, "mcp"},
+	}
+	cfg["mcp"] = mcp
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, data, 0644)
 }
 
 func jsonResult(data any, err error) (*mcp.CallToolResult, error) {
