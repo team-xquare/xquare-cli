@@ -121,7 +121,7 @@ func newGetCmd() *cobra.Command {
 			if owners, ok := p["owners"].([]any); ok {
 				for _, o := range owners {
 					if owner, ok := o.(map[string]any); ok {
-						rows = append(rows, []string{"Member", fmt.Sprintf("%v", owner["id"])})
+						rows = append(rows, []string{"Member", fmt.Sprintf("%v", owner["username"])})
 					}
 				}
 			}
@@ -227,9 +227,9 @@ func newMembersCmd() *cobra.Command {
 			}
 			rows := make([][]string, len(members))
 			for i, m := range members {
-				rows[i] = []string{fmt.Sprintf("%d", m.ID)}
+				rows[i] = []string{m.Username, fmt.Sprintf("%d", m.ID)}
 			}
-			output.Table([]string{"GITHUB ID"}, rows)
+			output.Table([]string{"USERNAME", "GITHUB ID"}, rows)
 			return nil
 		},
 	}
