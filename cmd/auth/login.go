@@ -39,7 +39,7 @@ Prints the URL to open in your browser.`,
 			apiClient := api.New(cfg.ServerURL, "")
 			resp, err := apiClient.AuthGitHub(cmd.Context(), code)
 			if err != nil {
-				return fmt.Errorf("auth: %w", err)
+				return err
 			}
 
 			cfg.Token = resp.Token
