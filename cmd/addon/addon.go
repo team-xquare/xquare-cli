@@ -209,18 +209,17 @@ func newAddonGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			delete(conn, "host")
 			if api.IsJSON(cmd) {
 				return output.JSON(conn)
 			}
 			ready := fmt.Sprintf("%v", conn["ready"]) == "true"
-			host := fmt.Sprintf("%v", conn["host"])
 			readyStr := "provisioning"
 			if ready {
 				readyStr = "ready"
 			}
 			addonType := fmt.Sprintf("%v", conn["type"])
 			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/addon-%s", project, addonName)
-			_ = host
 			rows := [][]string{
 				{"Status", readyStr},
 				{"Type", addonType},
