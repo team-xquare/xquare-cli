@@ -210,9 +210,6 @@ func newAddonGetCmd() *cobra.Command {
 				return err
 			}
 			delete(conn, "host")
-			if api.IsJSON(cmd) {
-				return output.JSON(conn)
-			}
 			ready := fmt.Sprintf("%v", conn["ready"]) == "true"
 			readyStr := "provisioning"
 			if ready {
@@ -220,6 +217,15 @@ func newAddonGetCmd() *cobra.Command {
 			}
 			addonType := fmt.Sprintf("%v", conn["type"])
 			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/addon-%s", project, addonName)
+			if api.IsJSON(cmd) {
+				return output.JSON(map[string]any{
+					"status":    readyStr,
+					"type":      addonType,
+					"host":      addonName,
+					"port":      conn["port"],
+					"dashboard": dashURL,
+				})
+			}
 			rows := [][]string{
 				{"Status", readyStr},
 				{"Type", addonType},
