@@ -223,9 +223,9 @@ func newStatusCmd() *cobra.Command {
 			statusDisplay := appStatus
 			switch deployPhase {
 			case "building":
-				statusDisplay = appStatus + "  (빌드 중...)"
+				statusDisplay = appStatus + "  (building...)"
 			case "syncing":
-				statusDisplay = appStatus + "  (배포 동기화 중...)"
+				statusDisplay = appStatus + "  (syncing...)"
 			}
 
 			// Instances display
@@ -234,9 +234,9 @@ func newStatusCmd() *cobra.Command {
 				instancesDisplay = "-"
 			}
 
-			ciReadyStr := "✓ ready"
+			ciReadyStr := "ready"
 			if !ciReady {
-				ciReadyStr = "⏳ preparing..."
+				ciReadyStr = "preparing..."
 			}
 			rows := [][]string{
 				{"Status", statusDisplay},
@@ -376,19 +376,19 @@ func newCreateCmd() *cobra.Command {
 			}
 
 			if wait {
-				output.Info("CI/CD 파이프라인 준비 중... (Ctrl+C to cancel)")
+				output.Info("initializing CI/CD pipeline... (Ctrl+C to cancel)")
 				if err := waitCIReady(cmd, api.FromCmd(cmd), project, appName); err != nil {
 					return err
 				}
-				output.Success("CI/CD 준비 완료 — git push 하면 자동 배포됩니다")
+				output.Success("CI/CD pipeline ready — push to GitHub to deploy")
 				return nil
 			}
 
 			output.Info("")
-			output.Info("CI/CD 파이프라인 준비 중... (약 2~3분 소요)")
-			output.Info("준비 완료 후: git push하면 자동 배포됩니다")
-			output.Info(fmt.Sprintf("  xquare app status %s            # 준비 상태 확인", appName))
-			output.Info(fmt.Sprintf("  xquare env set %s KEY=value     # 환경변수 설정", appName))
+			output.Info("CI/CD pipeline initializing... (~2-3 min)")
+			output.Info("once ready: push to GitHub to trigger auto-deploy")
+			output.Info(fmt.Sprintf("  xquare app status %s   # check readiness", appName))
+			output.Info(fmt.Sprintf("  xquare env set %s KEY=value   # set environment variables", appName))
 			return nil
 		},
 	}

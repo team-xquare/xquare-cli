@@ -146,7 +146,7 @@ func parseError(resp *http.Response) error {
 		if e.Code == "ci_not_ready" {
 			hint := ""
 			if e.RetryIn > 0 {
-				hint = fmt.Sprintf("\n\n약 %d초 후 다시 시도하세요.", e.RetryIn)
+				hint = fmt.Sprintf("\n\nretry in ~%d seconds", e.RetryIn)
 			}
 			return fmt.Errorf("%s%s", e.Error, hint)
 		}
