@@ -203,7 +203,8 @@ func (c *Client) GetDashboard(ctx context.Context, project string) (*DashboardIn
 }
 
 type Owner struct {
-	ID int64 `json:"id"`
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
 }
 
 func (c *Client) ListMembers(ctx context.Context, project string) ([]Owner, error) {
