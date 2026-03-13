@@ -69,8 +69,6 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 		switch e.Code {
 		case "not_deployed":
 			return fmt.Errorf("%s\n\n  xquare trigger %s --watch   # 배포 시작", e.Error, appName)
-		case "pod_not_ready":
-			return fmt.Errorf("%s\n\n  xquare logs %s   # 잠시 후 다시 시도하세요", e.Error, appName)
 		default:
 			if e.Error != "" {
 				return fmt.Errorf("%s", e.Error)
