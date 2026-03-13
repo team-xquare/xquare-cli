@@ -68,9 +68,9 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 		_ = json.NewDecoder(resp.Body).Decode(&e)
 		switch e.Code {
 		case "not_deployed":
-			return fmt.Errorf("%s\n\n  xquare trigger %s --watch   # 배포 시작", e.Error, appName)
+			return fmt.Errorf("%s\n\n  xquare trigger %s --watch   # start deployment", e.Error, appName)
 		case "start_timeout":
-			return fmt.Errorf("%s\n\n  xquare app status %s   # 상태 확인\n  xquare builds %s        # 빌드 로그 확인", e.Error, appName, appName)
+			return fmt.Errorf("%s\n\n  xquare app status %s   # check status\n  xquare builds %s        # check build logs", e.Error, appName, appName)
 		default:
 			if e.Error != "" {
 				return fmt.Errorf("%s", e.Error)
@@ -78,7 +78,7 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 			if resp.StatusCode == 404 {
 				return fmt.Errorf("app %q not found in project %q\n\n  xquare app list   # list apps in this project", appName, project)
 			}
-			return fmt.Errorf("로그를 가져올 수 없습니다 (status %d) — 잠시 후 다시 시도하세요", resp.StatusCode)
+			return fmt.Errorf("failed to fetch logs (status %d) — please retry", resp.StatusCode)
 		}
 	}
 
@@ -108,7 +108,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 			return fmt.Errorf("list builds: %w", err)
 		}
 		if len(builds) == 0 {
-			return fmt.Errorf("빌드 기록이 없습니다\n\n  xquare trigger %s   # 첫 배포 시작", appName)
+			return fmt.Errorf("no build history found\n\n  xquare trigger %s   # trigger first deployment", appName)
 		}
 		buildID = fmt.Sprintf("%v", builds[0]["id"])
 		buildStatus := fmt.Sprintf("%v", builds[0]["status"])
@@ -144,9 +144,9 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 				}
 			}
 			if printed {
-				output.Info("  연결이 끊어졌습니다. 재연결 중...")
+				output.Info("  connection lost, reconnecting...")
 			} else {
-				output.Info("  빌드 로그 대기 중...")
+				output.Info("  waiting for build logs...")
 			}
 			time.Sleep(2 * time.Second)
 		}

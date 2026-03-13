@@ -50,8 +50,8 @@ Use trigger only when:
 				output.Info("building and deploying... (Ctrl+C to stop)")
 				return watchFull(cmd, c, project, appName, buildID)
 			}
-			output.Info(fmt.Sprintf("  xquare logs %s --build          # 빌드 로그 실시간 확인", appName))
-			output.Info(fmt.Sprintf("  xquare trigger %s --watch        # 배포 완료까지 대기", appName))
+			output.Info(fmt.Sprintf("  xquare logs %s --build          # watch build logs", appName))
+			output.Info(fmt.Sprintf("  xquare trigger %s --watch        # wait until deployed", appName))
 			return nil
 		},
 	}
@@ -83,7 +83,7 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 		case <-cmd.Context().Done():
 			return nil
 		case <-timeout:
-			return fmt.Errorf("timeout (15min)\n\n  xquare logs %s --build   # 빌드 로그 확인", app)
+			return fmt.Errorf("timeout (15min)\n\n  xquare logs %s --build   # check build logs", app)
 		case <-ticker.C:
 			switch phase {
 
@@ -101,13 +101,13 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 				}
 				switch buildStatus {
 				case "success":
-					output.Success("[1/3] 빌드 완료")
-					output.Info("  [2/3] ArgoCD 배포 동기화 중...")
+					output.Success("[1/3] build complete")
+					output.Info("  [2/3] waiting for ArgoCD sync...")
 					phase = "syncing"
 				case "failed":
-					return fmt.Errorf("빌드 실패\n\n  xquare logs %s --build --build-id %s", app, buildID)
+					return fmt.Errorf("build failed\n\n  xquare logs %s --build --build-id %s", app, buildID)
 				default:
-					printOnce(fmt.Sprintf("  [1/3] 빌드 중...  [%s]", buildID))
+					printOnce(fmt.Sprintf("  [1/3] building...  [%s]", buildID))
 				}
 
 			case "syncing":
@@ -130,15 +130,15 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 					running = fmt.Sprintf("%v", sc["running"])
 					desired = fmt.Sprintf("%v", sc["desired"])
 				}
-				printOnce(fmt.Sprintf("  [3/3] 배포 중...  (%s/%s 실행 중)", running, desired))
+				printOnce(fmt.Sprintf("  [3/3] deploying...  (%s/%s running)", running, desired))
 				switch s {
 				case "running":
-					output.Success(fmt.Sprintf("배포 완료  (%s/%s running)", running, desired))
+					output.Success(fmt.Sprintf("deployed  (%s/%s running)", running, desired))
 					return nil
 				case "failed":
 					failCount++
 					if failCount >= 6 {
-						return fmt.Errorf("배포 실패 — Pod가 시작되지 않음\n\n  xquare logs %s", app)
+						return fmt.Errorf("deploy failed — pod did not start\n\n  xquare logs %s", app)
 					}
 					continue
 				default:

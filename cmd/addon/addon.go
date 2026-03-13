@@ -79,9 +79,9 @@ func newAddonListCmd() *cobra.Command {
 			}
 			rows := make([][]string, 0, len(addons))
 			for _, a := range addons {
-				readyStr := "⏳ 프로비저닝 중"
+				readyStr := "provisioning"
 				if fmt.Sprintf("%v", a["ready"]) == "true" {
-					readyStr = "✓ 사용 가능"
+					readyStr = "ready"
 				}
 				rows = append(rows, []string{
 					fmt.Sprintf("%v", a["name"]),
@@ -150,8 +150,8 @@ func newAddonCreateCmd() *cobra.Command {
 				return output.JSON(result)
 			}
 			output.Success(fmt.Sprintf("created addon '%s' (%s)", args[0], args[1]))
-			output.Info("DB 프로비저닝 중... (약 1~2분 소요)")
-			output.Info(fmt.Sprintf("  xquare addon list   # 준비 상태 확인"))
+			output.Info("provisioning addon... (may take 1-2 min)")
+			output.Info("  xquare addon list   # check provisioning status")
 			return nil
 		},
 	}
@@ -214,9 +214,9 @@ func newAddonGetCmd() *cobra.Command {
 			}
 			ready := fmt.Sprintf("%v", conn["ready"]) == "true"
 			host := fmt.Sprintf("%v", conn["host"])
-			readyStr := "⏳ 프로비저닝 중"
+			readyStr := "provisioning"
 			if ready {
-				readyStr = "✓ 사용 가능"
+				readyStr = "ready"
 			}
 			addonType := fmt.Sprintf("%v", conn["type"])
 			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/addon-%s", project, addonName)
