@@ -191,6 +191,17 @@ func (c *Client) DeleteProject(ctx context.Context, project string) error {
 	return c.delete(ctx, "/projects/"+project)
 }
 
+type DashboardInfo struct {
+	URL      string  `json:"url"`
+	Username string  `json:"username"`
+	Password *string `json:"password"`
+}
+
+func (c *Client) GetDashboard(ctx context.Context, project string) (*DashboardInfo, error) {
+	var out DashboardInfo
+	return &out, c.get(ctx, "/projects/"+project+"/dashboard", &out)
+}
+
 type Owner struct {
 	ID       int64  `json:"id"`
 	Username string `json:"username"`
