@@ -165,20 +165,8 @@ func newGetCmd() *cobra.Command {
 					break
 				}
 			}
-			// Endpoints
-			if eps, ok := a["endpoints"].([]any); ok {
-				for _, ep := range eps {
-					ep, ok := ep.(map[string]any)
-					if !ok {
-						continue
-					}
-					rows = append(rows, []string{"Port", fmt.Sprintf("%v", ep["port"])})
-					if routes, ok := ep["routes"].([]any); ok {
-						for _, r := range routes {
-							rows = append(rows, []string{"URL", "https://" + fmt.Sprintf("%v", r)})
-						}
-					}
-				}
+			for _, row := range endpointRows(a) {
+				rows = append(rows, row)
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
 			return nil
@@ -275,16 +263,8 @@ func newStatusCmd() *cobra.Command {
 				}
 			}
 			if appCfg != nil {
-				if eps, ok := appCfg["endpoints"].([]any); ok {
-					for _, ep := range eps {
-						if ep, ok := ep.(map[string]any); ok {
-							if routes, ok := ep["routes"].([]any); ok {
-								for _, r := range routes {
-									rows = append(rows, []string{"URL", "https://" + fmt.Sprintf("%v", r)})
-								}
-							}
-						}
-					}
+				for _, row := range endpointRows(appCfg) {
+					rows = append(rows, row)
 				}
 			}
 			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/app-%s", project, args[0])
@@ -384,12 +364,14 @@ func newCreateCmd() *cobra.Command {
 				return output.JSON(result)
 			}
 			output.Success(fmt.Sprintf("created app %s in project %s", appName, project))
-			// Show assigned URLs if endpoints were configured
 			for _, ep := range endpoints {
-				if routes, ok := ep["routes"].([]string); ok {
+				port := fmt.Sprintf("%v", ep["port"])
+				if routes, ok := ep["routes"].([]string); ok && len(routes) > 0 {
 					for _, r := range routes {
-						output.Info(fmt.Sprintf("  URL: https://%s", r))
+						output.Info(fmt.Sprintf("  :%s → https://%s", port, r))
 					}
+				} else {
+					output.Info(fmt.Sprintf("  :%s (internal)", port))
 				}
 			}
 
@@ -987,4 +969,32 @@ func buildAppBody(name, buildType, owner, repo, branch string, endpoints []map[s
 		body["endpoints"] = endpoints
 	}
 	return body
+}
+
+// endpointRows formats an app's endpoints as table rows for display.
+// Each endpoint becomes one row: ":port → https://route1, https://route2"
+// If no routes are configured, it shows ":port (internal)".
+func endpointRows(a map[string]any) [][]string {
+	eps, ok := a["endpoints"].([]any)
+	if !ok || len(eps) == 0 {
+		return nil
+	}
+	var rows [][]string
+	for _, e := range eps {
+		ep, ok := e.(map[string]any)
+		if !ok {
+			continue
+		}
+		port := fmt.Sprintf("%v", ep["port"])
+		if routes, ok := ep["routes"].([]any); ok && len(routes) > 0 {
+			var urls []string
+			for _, r := range routes {
+				urls = append(urls, "https://"+fmt.Sprintf("%v", r))
+			}
+			rows = append(rows, []string{"Endpoint", ":" + port + " → " + strings.Join(urls, ", ")})
+		} else {
+			rows = append(rows, []string{"Endpoint", ":" + port + " (internal)"})
+		}
+	}
+	return rows
 }
