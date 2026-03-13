@@ -166,12 +166,16 @@ func newGetCmd() *cobra.Command {
 				}
 			}
 			// Endpoints
-			if eps, ok := a["endpoints"].([]any); ok && len(eps) > 0 {
-				if ep, ok := eps[0].(map[string]any); ok {
+			if eps, ok := a["endpoints"].([]any); ok {
+				for _, ep := range eps {
+					ep, ok := ep.(map[string]any)
+					if !ok {
+						continue
+					}
 					rows = append(rows, []string{"Port", fmt.Sprintf("%v", ep["port"])})
-					if routes, ok := ep["routes"].([]any); ok && len(routes) > 0 {
+					if routes, ok := ep["routes"].([]any); ok {
 						for _, r := range routes {
-							rows = append(rows, []string{"Route", fmt.Sprintf("%v", r)})
+							rows = append(rows, []string{"URL", "https://" + fmt.Sprintf("%v", r)})
 						}
 					}
 				}
@@ -193,10 +197,22 @@ func newStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Fetch status and app config in parallel to show URL alongside status.
+			type result struct {
+				status map[string]any
+				app    map[string]any
+				err    error
+			}
+			ch := make(chan result, 1)
+			go func() {
+				a, _ := c.GetApp(cmd.Context(), project, args[0])
+				ch <- result{app: a}
+			}()
 			status, err := c.GetAppStatus(cmd.Context(), project, args[0])
 			if err != nil {
 				return err
 			}
+			appCfg := (<-ch).app
 			if api.IsJSON(cmd) {
 				return output.JSON(status)
 			}
@@ -255,6 +271,19 @@ func newStatusCmd() *cobra.Command {
 				for i, instance := range inst {
 					if p, ok := instance.(map[string]any); ok {
 						rows = append(rows, []string{fmt.Sprintf("Instance %d", i+1), fmt.Sprintf("status=%v  restarts=%v", p["status"], p["restarts"])})
+					}
+				}
+			}
+			if appCfg != nil {
+				if eps, ok := appCfg["endpoints"].([]any); ok {
+					for _, ep := range eps {
+						if ep, ok := ep.(map[string]any); ok {
+							if routes, ok := ep["routes"].([]any); ok {
+								for _, r := range routes {
+									rows = append(rows, []string{"URL", "https://" + fmt.Sprintf("%v", r)})
+								}
+							}
+						}
 					}
 				}
 			}
@@ -355,6 +384,14 @@ func newCreateCmd() *cobra.Command {
 				return output.JSON(result)
 			}
 			output.Success(fmt.Sprintf("created app %s in project %s", appName, project))
+			// Show assigned URLs if endpoints were configured
+			for _, ep := range endpoints {
+				if routes, ok := ep["routes"].([]string); ok {
+					for _, r := range routes {
+						output.Info(fmt.Sprintf("  URL: https://%s", r))
+					}
+				}
+			}
 
 			if wait {
 				output.Info("CI/CD 파이프라인 준비 중... (Ctrl+C to cancel)")
@@ -377,7 +414,7 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().String("owner", "", "GitHub owner (auto-detected from git remote)")
 	cmd.Flags().String("repo", "", "GitHub repository name")
 	cmd.Flags().String("branch", "main", "GitHub branch")
-	cmd.Flags().StringArray("endpoint", []string{}, "service endpoint: <port>[:<route1>,<route2>] (repeatable, e.g. --endpoint 8080:api.dsmhs.kr --endpoint 9090)")
+	cmd.Flags().StringArray("endpoint", []string{}, "expose port with optional domain: <port>[:<hostname>] (e.g. --endpoint 8080:myapp.dsmhs.kr). The hostname becomes the public URL (https://hostname).")
 	cmd.Flags().StringSlice("trigger-paths", []string{}, "only trigger CI when these paths change (e.g. src/**,Dockerfile)")
 	cmd.Flags().String("java-version", "17", "Java version")
 	cmd.Flags().String("node-version", "20", "Node.js version")
