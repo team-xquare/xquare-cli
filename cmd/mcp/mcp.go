@@ -276,6 +276,18 @@ DEPLOYMENT FLOW after create_app:
 				}
 
 				// Trigger paths
+				if owner := req.GetString("github_owner", ""); owner != "" {
+					if gh, ok := body["github"].(map[string]any); ok {
+						gh["owner"] = owner
+					}
+				}
+
+				if repo := req.GetString("github_repo", ""); repo != "" {
+					if gh, ok := body["github"].(map[string]any); ok {
+						gh["repo"] = repo
+					}
+				}
+
 				if tp := req.GetString("trigger_paths", ""); tp != "" {
 					paths := strings.Split(tp, ",")
 					if gh, ok := body["github"].(map[string]any); ok {
@@ -290,13 +302,14 @@ DEPLOYMENT FLOW after create_app:
 			s.AddTool(mcp.NewTool("update_app",
 				mcp.WithDescription(`Update application configuration. Only specified fields are changed.
 
-Updatable fields: build_type, endpoints, github_branch, trigger_paths, build_options
-Note: github_owner and github_repo cannot be changed after creation.`),
+Updatable fields: build_type, endpoints, github_branch, github_owner, github_repo, trigger_paths, build_options`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 				mcp.WithString("build_type", mcp.Description("New build type: gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),
 				mcp.WithString("endpoints", mcp.Description(`JSON array of endpoint strings. Example: ["8080:api.dsmhs.kr","9090"]`)),
 				mcp.WithString("github_branch", mcp.Description("New GitHub branch")),
+				mcp.WithString("github_owner", mcp.Description("New GitHub org or user name")),
+				mcp.WithString("github_repo", mcp.Description("New GitHub repository name")),
 				mcp.WithString("trigger_paths", mcp.Description("Comma-separated CI trigger paths, e.g. src/**,Dockerfile")),
 				mcp.WithString("build_options", mcp.Description("JSON object of build-type specific options")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
