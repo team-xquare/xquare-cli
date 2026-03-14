@@ -143,6 +143,9 @@ func parseError(resp *http.Response) error {
 		if e.InstallURL != "" {
 			return fmt.Errorf("%s\n\nInstall the GitHub App at: %s", e.Error, e.InstallURL)
 		}
+		if e.Code == "not_authorized" {
+			return fmt.Errorf("access not granted\n\nYour GitHub account has not been added to this platform.\nAsk a platform admin to run:\n\n  xquare admin allowlist add <your-github-username>")
+		}
 		if e.Code == "ci_not_ready" {
 			hint := ""
 			if e.RetryIn > 0 {
