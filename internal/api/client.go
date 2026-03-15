@@ -15,8 +15,25 @@ import (
 type Client struct {
 	base         string
 	token        string
+	tokenFn      func() string // if set, called on every request instead of static token
 	httpClient   *http.Client
 	streamClient *http.Client // no timeout — long-lived streaming; context handles cancellation
+}
+
+// NewWithTokenFn creates a Client that calls tokenFn on every request to get
+// a fresh token. Use this when the token may change during the process lifetime
+// (e.g. MCP server sessions that outlive the token TTL).
+func NewWithTokenFn(base string, tokenFn func() string) *Client {
+	c := New(base, "")
+	c.tokenFn = tokenFn
+	return c
+}
+
+func (c *Client) currentToken() string {
+	if c.tokenFn != nil {
+		return c.tokenFn()
+	}
+	return c.token
 }
 
 func New(base, token string) *Client {
@@ -65,8 +82,8 @@ func (c *Client) do(ctx context.Context, method, path string, body any) (*http.R
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	if tok := c.currentToken(); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	req.Header.Set("Accept", "application/json")
 
@@ -261,7 +278,7 @@ func (c *Client) TriggerApp(ctx context.Context, project, app string) (map[strin
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Authorization", "Bearer "+c.currentToken())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -334,7 +351,7 @@ func (c *Client) StreamLogs(ctx context.Context, project, app string, tail int64
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Authorization", "Bearer "+c.currentToken())
 	return c.streamClient.Do(req)
 }
 
@@ -381,6 +398,6 @@ func (c *Client) StreamBuildLogs(ctx context.Context, project, app, workflow str
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Authorization", "Bearer "+c.currentToken())
 	return c.streamClient.Do(req)
 }

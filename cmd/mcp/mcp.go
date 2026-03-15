@@ -72,7 +72,13 @@ Use a registration flag to add xquare as an MCP server in your AI tool:
 			if err != nil || cfg.Token == "" {
 				return fmt.Errorf("not logged in — run: xquare login")
 			}
-			client := api.New(cfg.ServerURL, cfg.Token)
+			client := api.NewWithTokenFn(cfg.ServerURL, func() string {
+				c, err := config.LoadGlobal()
+				if err != nil {
+					return ""
+				}
+				return c.Token
+			})
 
 			s := server.NewMCPServer("xquare", "1.0.0",
 				server.WithToolCapabilities(true),
