@@ -372,6 +372,18 @@ Updatable fields: build_type, endpoints, github_branch, github_owner, github_rep
 					}
 				}
 
+				if owner := req.GetString("github_owner", ""); owner != "" {
+					if gh, ok := body["github"].(map[string]any); ok {
+						gh["owner"] = owner
+					}
+				}
+
+				if repo := req.GetString("github_repo", ""); repo != "" {
+					if gh, ok := body["github"].(map[string]any); ok {
+						gh["repo"] = repo
+					}
+				}
+
 				if tp := req.GetString("trigger_paths", ""); tp != "" {
 					if gh, ok := body["github"].(map[string]any); ok {
 						gh["triggerPaths"] = strings.Split(tp, ",")
