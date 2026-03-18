@@ -599,8 +599,21 @@ For local tunneling use 'xquare addon tunnel' CLI command.`),
 				if err != nil {
 					return jsonResult(nil, err)
 				}
-				// Strip internal tunnel credentials from MCP response
 				addonType := fmt.Sprintf("%v", data["type"])
+
+				// seaweedfs: S3-compatible object storage — return bucket credentials, not DB fields
+				if addonType == "seaweedfs" {
+					return jsonResult(map[string]any{
+						"name":    addon,
+						"type":    addonType,
+						"ready":   data["ready"],
+						"port":    data["port"],
+						"buckets": data["buckets"],
+						"note":    "S3-compatible storage. Use bucket accessKey/secretKey with any AWS S3 SDK. In-cluster host: " + addon,
+					}, nil)
+				}
+
+				// DB/cache addons: strip internal tunnel credentials
 				defaultUser := map[string]string{
 					"postgresql": "postgres",
 					"mysql":      "root",

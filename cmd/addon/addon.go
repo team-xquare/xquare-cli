@@ -308,6 +308,9 @@ func newAddonConnectCmd() *cobra.Command {
 			}
 
 			addonType := fmt.Sprintf("%v", conn["type"])
+			if addonType == "seaweedfs" {
+				return fmt.Errorf("seaweedfs is an S3-compatible object storage — use an S3 client (AWS SDK, s3cmd, etc.) instead\n\n  xquare addon status %s   # get bucket credentials", addonName)
+			}
 			tunnelHost := fmt.Sprintf("%v", conn["host"])
 			portF, portOK := conn["port"].(float64)
 			if !portOK {
