@@ -517,11 +517,17 @@ BEFORE calling this tool you MUST:
 
 CONSTRAINTS:
 - type: mysql | postgresql | redis | mongodb | kafka | rabbitmq | opensearch | elasticsearch | qdrant | seaweedfs
-- storage: must be less than 4Gi. Default: 2Gi. Examples: 500Mi, 1Gi, 2Gi, 3Gi`),
+- storage: must be less than 4Gi. Default: 2Gi. Examples: 500Mi, 1Gi, 2Gi, 3Gi
+
+seaweedfs (S3-compatible object storage):
+- MUST specify buckets — without buckets the S3 API is disabled and the addon is unusable
+- After creation, use get_addon_status to get each bucket's accessKey and secretKey
+- AWS SDK config: endpoint=http://{addon-name}:8333, region=us-east-1 (any value works)`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("name", mcp.Required(), mcp.Description("Addon name")),
 				mcp.WithString("addon_type", mcp.Required(), mcp.Description("mysql|postgresql|redis|mongodb|kafka|rabbitmq|opensearch|elasticsearch|qdrant|seaweedfs")),
 				mcp.WithString("storage", mcp.Description("Storage size, must be < 4Gi (default: 2Gi). Examples: 500Mi, 1Gi, 2Gi")),
+				mcp.WithString("buckets", mcp.Description("seaweedfs only: comma-separated bucket names. Example: uploads,thumbnails")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				project, err := req.RequireString("project")
 				if err != nil {
@@ -536,10 +542,19 @@ CONSTRAINTS:
 					return mcp.NewToolResultError(err.Error()), nil
 				}
 				storage := req.GetString("storage", "2Gi")
-				body := map[string]string{
+				body := map[string]any{
 					"name":    name,
 					"type":    addonType,
 					"storage": storage,
+				}
+				if bucketsStr := req.GetString("buckets", ""); bucketsStr != "" && addonType == "seaweedfs" {
+					var buckets []map[string]string
+					for _, b := range strings.Split(bucketsStr, ",") {
+						if b = strings.TrimSpace(b); b != "" {
+							buckets = append(buckets, map[string]string{"name": b})
+						}
+					}
+					body["buckets"] = buckets
 				}
 				data, err := client.CreateAddon(ctx, project, body)
 				return jsonResult(data, err)
@@ -615,7 +630,7 @@ For local tunneling use 'xquare addon tunnel' CLI command.`),
 						"ready":   ready,
 						"port":    port,
 						"buckets": data["buckets"],
-						"note":    "S3-compatible storage. Use bucket accessKey/secretKey with any AWS S3 SDK. In-cluster host: " + host,
+						"note":    "S3-compatible storage. Configure AWS SDK: endpoint=http://" + host + ":8333, region=us-east-1 (any value). Use bucket accessKey/secretKey from the buckets field. No buckets = S3 API disabled.",
 					}, nil)
 				case "kafka":
 					return jsonResult(map[string]any{
