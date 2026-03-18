@@ -423,6 +423,16 @@ func addonSchema() CommandSchema {
 				Examples: []string{"xquare addon delete mydb --yes"},
 			},
 			{
+				Command:     "addon update <name>",
+				Description: "Update addon configuration. Currently supports adding/changing buckets for seaweedfs.",
+				Args:        []ArgSchema{{Name: "name", Required: true}},
+				Flags: []FlagSchema{
+					{Name: "buckets", Type: "string", Desc: "seaweedfs: new comma-separated bucket list (replaces existing). Example: uploads,thumbnails,avatars"},
+					{Name: "dry-run", Type: "bool", Desc: "preview without updating"},
+				},
+				Examples: []string{"xquare addon update my-storage --buckets uploads,thumbnails,avatars"},
+			},
+			{
 				Command:     "addon status <name>",
 				Description: "Show status and connection info for an addon (ready, host, port, password). Password is the wstunnel access key.",
 				Args:        []ArgSchema{{Name: "name", Required: true}},

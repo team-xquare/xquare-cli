@@ -47,6 +47,7 @@ func NewAddonCmd() *cobra.Command {
 	cmd.AddCommand(
 		newAddonListCmd(),
 		newAddonCreateCmd(),
+		newAddonUpdateCmd(),
 		newAddonDeleteCmd(),
 		newAddonGetCmd(),
 		newAddonConnectCmd(),
@@ -171,6 +172,50 @@ func newAddonCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&storage, "storage", "2Gi", "storage size, max 4Gi (e.g. 2Gi, 500Mi)")
 	cmd.Flags().StringVar(&bootstrap, "bootstrap", "", "bootstrap SQL/script")
+	cmd.Flags().StringVar(&buckets, "buckets", "", "seaweedfs: comma-separated bucket names (e.g. uploads,thumbnails)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
+	return cmd
+}
+
+func newAddonUpdateCmd() *cobra.Command {
+	var buckets string
+	var dryRun bool
+	cmd := &cobra.Command{
+		Use:   "update <name>",
+		Short: "Update addon configuration (e.g. add/change seaweedfs buckets)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			addonName := args[0]
+			if buckets == "" {
+				return fmt.Errorf("nothing to update\n\nAvailable flags:\n  --buckets   seaweedfs: comma-separated bucket names")
+			}
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			if dryRun {
+				output.Info(fmt.Sprintf("[dry-run] would update addon '%s' in project %s with buckets: %s", addonName, project, buckets))
+				return nil
+			}
+			var bucketList []map[string]string
+			for _, b := range strings.Split(buckets, ",") {
+				if b = strings.TrimSpace(b); b != "" {
+					bucketList = append(bucketList, map[string]string{"name": b})
+				}
+			}
+			c := api.FromCmd(cmd)
+			result, err := c.UpdateAddon(cmd.Context(), project, addonName, map[string]any{"buckets": bucketList})
+			if err != nil {
+				return err
+			}
+			if api.IsJSON(cmd) {
+				return output.JSON(result)
+			}
+			output.Success(fmt.Sprintf("updated addon '%s'", addonName))
+			output.Info("  xquare addon status " + addonName + "   # verify changes")
+			return nil
+		},
+	}
 	cmd.Flags().StringVar(&buckets, "buckets", "", "seaweedfs: comma-separated bucket names (e.g. uploads,thumbnails)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
