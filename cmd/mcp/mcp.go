@@ -560,6 +560,40 @@ seaweedfs (S3-compatible object storage):
 				return jsonResult(data, err)
 			})
 
+			s.AddTool(mcp.NewTool("update_addon",
+				mcp.WithDescription(`Update addon configuration. Currently supports adding/changing buckets for seaweedfs addons.
+
+seaweedfs buckets:
+- Replaces the bucket list — include ALL buckets you want (existing + new)
+- Existing data in unchanged buckets is preserved
+- New buckets are created; removed buckets lose access (data stays on disk)
+- After update, use get_addon_status to get updated bucket credentials`),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("addon", mcp.Required(), mcp.Description("Addon name")),
+				mcp.WithString("buckets", mcp.Required(), mcp.Description("seaweedfs: comma-separated bucket names. Example: uploads,thumbnails,avatars")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				addon, err := req.RequireString("addon")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				bucketsStr, err := req.RequireString("buckets")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				var bucketList []map[string]string
+				for _, b := range strings.Split(bucketsStr, ",") {
+					if b = strings.TrimSpace(b); b != "" {
+						bucketList = append(bucketList, map[string]string{"name": b})
+					}
+				}
+				data, err := client.UpdateAddon(ctx, project, addon, map[string]any{"buckets": bucketList})
+				return jsonResult(data, err)
+			})
+
 			s.AddTool(mcp.NewTool("delete_addon",
 				mcp.WithDescription(`⚠️  DESTRUCTIVE — IRREVERSIBLE. Deletes the addon AND ALL its persistent data (database contents, files) forever. Data cannot be recovered.
 

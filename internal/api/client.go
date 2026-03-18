@@ -326,6 +326,11 @@ func (c *Client) CreateAddon(ctx context.Context, project string, body any) (map
 	return out, c.post(ctx, "/projects/"+project+"/addons", body, &out)
 }
 
+func (c *Client) UpdateAddon(ctx context.Context, project, addon string, body any) (map[string]any, error) {
+	var out map[string]any
+	return out, c.put(ctx, "/projects/"+project+"/addons/"+addon, body, &out)
+}
+
 func (c *Client) DeleteAddon(ctx context.Context, project, addon string) error {
 	return c.delete(ctx, "/projects/"+project+"/addons/"+addon)
 }
