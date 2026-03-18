@@ -99,20 +99,25 @@ func newAddonListCmd() *cobra.Command {
 func newAddonCreateCmd() *cobra.Command {
 	var storage string
 	var bootstrap string
+	var buckets string
 	var dryRun bool
 
 	cmd := &cobra.Command{
 		Use:   "create <name> <type>",
-		Short: "Create an addon (mysql, postgresql, redis, mongodb, etc.)",
+		Short: "Create an addon (mysql, postgresql, redis, mongodb, seaweedfs, etc.)",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			addonType := args[1]
 			validTypes := map[string]bool{
 				"mysql": true, "postgresql": true, "redis": true, "mongodb": true,
 				"kafka": true, "rabbitmq": true, "opensearch": true, "elasticsearch": true, "qdrant": true,
+				"seaweedfs": true,
 			}
 			if !validTypes[addonType] {
-				return fmt.Errorf("unsupported addon type %q\n\nSupported types: mysql, postgresql, redis, mongodb, kafka, rabbitmq, opensearch, elasticsearch, qdrant", addonType)
+				return fmt.Errorf("unsupported addon type %q\n\nSupported types: mysql, postgresql, redis, mongodb, kafka, rabbitmq, opensearch, elasticsearch, qdrant, seaweedfs", addonType)
+			}
+			if addonType == "seaweedfs" && buckets == "" {
+				return fmt.Errorf("seaweedfs requires --buckets\n\nSpecify comma-separated bucket names:\n  --buckets uploads,thumbnails")
 			}
 			storageBytes, err := parseStorageBytes(storage)
 			if err != nil {
@@ -130,7 +135,7 @@ func newAddonCreateCmd() *cobra.Command {
 				return nil
 			}
 			c := api.FromCmd(cmd)
-			body := map[string]string{
+			body := map[string]any{
 				"name":    args[0],
 				"type":    args[1],
 				"storage": storage,
@@ -141,6 +146,15 @@ func newAddonCreateCmd() *cobra.Command {
 					return fmt.Errorf("bootstrap exceeds maximum size of %d bytes (%d bytes provided)", maxBootstrap, len(bootstrap))
 				}
 				body["bootstrap"] = bootstrap
+			}
+			if buckets != "" && addonType == "seaweedfs" {
+				var bucketList []map[string]string
+				for _, b := range strings.Split(buckets, ",") {
+					if b = strings.TrimSpace(b); b != "" {
+						bucketList = append(bucketList, map[string]string{"name": b})
+					}
+				}
+				body["buckets"] = bucketList
 			}
 			result, err := c.CreateAddon(cmd.Context(), project, body)
 			if err != nil {
@@ -157,6 +171,7 @@ func newAddonCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&storage, "storage", "2Gi", "storage size, max 4Gi (e.g. 2Gi, 500Mi)")
 	cmd.Flags().StringVar(&bootstrap, "bootstrap", "", "bootstrap SQL/script")
+	cmd.Flags().StringVar(&buckets, "buckets", "", "seaweedfs: comma-separated bucket names (e.g. uploads,thumbnails)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
 }
