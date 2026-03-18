@@ -217,6 +217,53 @@ func newAddonGetCmd() *cobra.Command {
 			}
 			addonType := fmt.Sprintf("%v", conn["type"])
 			dashURL := fmt.Sprintf("https://%s-observability-dashboard.dsmhs.kr/d/addon-%s", project, addonName)
+
+			if addonType == "seaweedfs" {
+				type bucketInfo struct {
+					Name      string `json:"name"`
+					AccessKey string `json:"accessKey"`
+					SecretKey string `json:"secretKey"`
+				}
+				var buckets []bucketInfo
+				if raw, ok := conn["buckets"].([]any); ok {
+					for _, b := range raw {
+						if m, ok := b.(map[string]any); ok {
+							buckets = append(buckets, bucketInfo{
+								Name:      fmt.Sprintf("%v", m["name"]),
+								AccessKey: fmt.Sprintf("%v", m["accessKey"]),
+								SecretKey: fmt.Sprintf("%v", m["secretKey"]),
+							})
+						}
+					}
+				}
+				if api.IsJSON(cmd) {
+					return output.JSON(map[string]any{
+						"status":    readyStr,
+						"type":      addonType,
+						"host":      addonName,
+						"port":      conn["port"],
+						"dashboard": dashURL,
+						"buckets":   buckets,
+					})
+				}
+				rows := [][]string{
+					{"Status", readyStr},
+					{"Type", addonType},
+					{"In-Cluster Host", addonName},
+					{"Port", fmt.Sprintf("%v", conn["port"])},
+					{"Dashboard", dashURL},
+				}
+				for _, b := range buckets {
+					rows = append(rows,
+						[]string{"Bucket", b.Name},
+						[]string{"  Access Key", b.AccessKey},
+						[]string{"  Secret Key", b.SecretKey},
+					)
+				}
+				output.Table([]string{"FIELD", "VALUE"}, rows)
+				return nil
+			}
+
 			if api.IsJSON(cmd) {
 				return output.JSON(map[string]any{
 					"status":    readyStr,
@@ -261,6 +308,9 @@ func newAddonConnectCmd() *cobra.Command {
 			}
 
 			addonType := fmt.Sprintf("%v", conn["type"])
+			if addonType == "seaweedfs" {
+				return fmt.Errorf("seaweedfs is an S3-compatible object storage — use an S3 client (AWS SDK, s3cmd, etc.) instead\n\n  xquare addon status %s   # get bucket credentials", addonName)
+			}
 			tunnelHost := fmt.Sprintf("%v", conn["host"])
 			portF, portOK := conn["port"].(float64)
 			if !portOK {
