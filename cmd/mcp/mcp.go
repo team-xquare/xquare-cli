@@ -575,14 +575,17 @@ BEFORE calling this tool you MUST:
 			})
 
 			s.AddTool(mcp.NewTool("get_addon_status",
-				mcp.WithDescription(`Get status and connection info for an addon. Returns ready-to-use env var values.
+				mcp.WithDescription(`Get status and connection info for an addon. Returns ready-to-use connection values.
 
-⚠️  CRITICAL — xquare addons have NO PASSWORD. Never ask the user for a DB password. Never look for one.
-The response includes all env vars you need. Just use them as-is.
+Response fields vary by addon type:
+  mysql/postgresql/mongodb/redis → db_host, db_port, db_user, db_password, db_name
+  kafka                          → bootstrap_servers
+  rabbitmq                       → amqp_url, amqp_host, amqp_port, amqp_user, amqp_password, management_url
+  elasticsearch/opensearch       → host, port, url
+  qdrant                         → host, http_port, grpc_port, http_url
+  seaweedfs                      → port, buckets[]{name, accessKey, secretKey}
 
-Response fields are ready-to-use:
-  db_host, db_port, db_user, db_password (always empty), db_name
-
+⚠️  mysql/postgresql/mongodb/redis have NO PASSWORD — never ask the user for one.
 For local tunneling use 'xquare addon tunnel' CLI command.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("addon", mcp.Required(), mcp.Description("Addon name")),
@@ -600,42 +603,86 @@ For local tunneling use 'xquare addon tunnel' CLI command.`),
 					return jsonResult(nil, err)
 				}
 				addonType := fmt.Sprintf("%v", data["type"])
+				host := addon
+				port := data["port"]
+				ready := data["ready"]
 
-				// seaweedfs: S3-compatible object storage — return bucket credentials, not DB fields
-				if addonType == "seaweedfs" {
+				switch addonType {
+				case "seaweedfs":
 					return jsonResult(map[string]any{
 						"name":    addon,
 						"type":    addonType,
-						"ready":   data["ready"],
-						"port":    data["port"],
+						"ready":   ready,
+						"port":    port,
 						"buckets": data["buckets"],
-						"note":    "S3-compatible storage. Use bucket accessKey/secretKey with any AWS S3 SDK. In-cluster host: " + addon,
+						"note":    "S3-compatible storage. Use bucket accessKey/secretKey with any AWS S3 SDK. In-cluster host: " + host,
+					}, nil)
+				case "kafka":
+					return jsonResult(map[string]any{
+						"name":              addon,
+						"type":              addonType,
+						"ready":             ready,
+						"bootstrap_servers": fmt.Sprintf("%s:9092", host),
+						"note":              "Use bootstrap_servers in your Kafka client config.",
+					}, nil)
+				case "rabbitmq":
+					return jsonResult(map[string]any{
+						"name":           addon,
+						"type":           addonType,
+						"ready":          ready,
+						"amqp_url":       fmt.Sprintf("amqp://guest:guest@%s:5672/", host),
+						"amqp_host":      host,
+						"amqp_port":      5672,
+						"amqp_user":      "guest",
+						"amqp_password":  "guest",
+						"management_url": fmt.Sprintf("http://%s:15672", host),
+						"note":           "Default credentials: guest/guest.",
+					}, nil)
+				case "elasticsearch", "opensearch":
+					return jsonResult(map[string]any{
+						"name":  addon,
+						"type":  addonType,
+						"ready": ready,
+						"host":  host,
+						"port":  port,
+						"url":   fmt.Sprintf("http://%s:9200", host),
+						"note":  "No authentication required.",
+					}, nil)
+				case "qdrant":
+					return jsonResult(map[string]any{
+						"name":      addon,
+						"type":      addonType,
+						"ready":     ready,
+						"host":      host,
+						"http_port": 6333,
+						"grpc_port": 6334,
+						"http_url":  fmt.Sprintf("http://%s:6333", host),
+						"note":      "No authentication required.",
+					}, nil)
+				default:
+					// mysql, postgresql, mongodb, redis
+					dbUser := map[string]string{
+						"postgresql": "postgres",
+						"mysql":      "root",
+						"mongodb":    "(no auth)",
+						"redis":      "(no auth)",
+					}[addonType]
+					if dbUser == "" {
+						dbUser = "(no auth)"
+					}
+					dbName := strings.ReplaceAll(addon, "-", "_")
+					return jsonResult(map[string]any{
+						"name":        addon,
+						"type":        addonType,
+						"ready":       ready,
+						"db_host":     host,
+						"db_port":     port,
+						"db_user":     dbUser,
+						"db_password": "(none — no password required)",
+						"db_name":     dbName,
+						"note":        "No password needed. Connect directly using the addon name as hostname inside your app.",
 					}, nil)
 				}
-
-				// DB/cache addons: strip internal tunnel credentials
-				defaultUser := map[string]string{
-					"postgresql": "postgres",
-					"mysql":      "root",
-					"mongodb":    "(no auth)",
-					"redis":      "(no auth)",
-				}[addonType]
-				if defaultUser == "" {
-					defaultUser = "(no auth)"
-				}
-				safe := map[string]any{
-					"name":        addon,
-					"type":        addonType,
-					"ready":       data["ready"],
-					"port":        data["port"],
-					"db_host":     addon,
-					"db_port":     data["port"],
-					"db_user":     defaultUser,
-					"db_password": "(none — no password required)",
-					"db_name":     addon,
-					"note":        "No password needed. Connect directly using the addon name as hostname inside your app.",
-				}
-				return jsonResult(safe, nil)
 			})
 
 			// ── Deploy & logs ─────────────────────────────────────────────
