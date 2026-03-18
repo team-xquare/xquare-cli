@@ -69,7 +69,7 @@ func buildSchema() map[string]any {
 			"addon_name":    "same rules as app_name",
 			"storage":       "number + unit, must be less than 4Gi. Examples: 1Gi, 500Mi, 2Gi. Default: 2Gi",
 			"build_type":    "gradle | nodejs | react | vite | vue | nextjs | nextjs-export | go | rust | maven | django | flask | docker",
-			"addon_type":    "mysql | postgresql | redis | mongodb | kafka | rabbitmq | opensearch | elasticsearch | qdrant",
+			"addon_type":    "mysql | postgresql | redis | mongodb | kafka | rabbitmq | opensearch | elasticsearch | qdrant | seaweedfs",
 			"endpoint":      "<port> or <port>:<domain1>,<domain2>. Example: 8080 or 8080:api.dsmhs.kr or 8080:api.dsmhs.kr,admin.dsmhs.kr",
 			"trigger_paths": "comma-separated glob patterns for CI trigger filtering. Example: src/**,Dockerfile,go.mod",
 		},
@@ -379,7 +379,7 @@ func addonSchema() CommandSchema {
 		Command:     "addon",
 		Description: "Manage database/cache addons (StatefulSets with persistent storage).",
 		Constraints: map[string]string{
-			"type":    "mysql | postgresql | redis | mongodb | kafka | rabbitmq | opensearch | elasticsearch | qdrant",
+			"type":    "mysql | postgresql | redis | mongodb | kafka | rabbitmq | opensearch | elasticsearch | qdrant | seaweedfs",
 			"storage": "number + unit, must be less than 4Gi. Examples: 1Gi, 500Mi, 2Gi. Default: 2Gi",
 		},
 		SubCommands: []CommandSchema{
@@ -393,18 +393,23 @@ func addonSchema() CommandSchema {
 				Description: "Provision a new database/cache addon. Takes 1-2 minutes to become ready.",
 				Args: []ArgSchema{
 					{Name: "name", Required: true, Desc: "addon name"},
-					{Name: "type", Required: true, Desc: "mysql|postgresql|redis|mongodb|kafka|rabbitmq|opensearch|elasticsearch|qdrant"},
+					{Name: "type", Required: true, Desc: "mysql|postgresql|redis|mongodb|kafka|rabbitmq|opensearch|elasticsearch|qdrant|seaweedfs"},
 				},
 				Flags: []FlagSchema{
 					{Name: "storage", Type: "string", Default: "2Gi", Desc: "storage size, must be less than 4Gi (e.g. 1Gi, 500Mi, 2Gi)"},
 					{Name: "bootstrap", Type: "string", Desc: "bootstrap SQL or script to run on first start"},
+					{Name: "buckets", Type: "string", Desc: "seaweedfs only: comma-separated bucket names (required for seaweedfs). Example: uploads,thumbnails"},
 					{Name: "dry-run", Type: "bool", Desc: "preview without creating"},
 				},
-				Constraints: map[string]string{"storage": "< 4Gi required"},
+				Constraints: map[string]string{
+					"storage": "< 4Gi required",
+					"buckets": "seaweedfs only, required — S3 API disabled without buckets",
+				},
 				Examples: []string{
 					"xquare addon create mydb mysql",
 					"xquare addon create mydb postgresql --storage 2Gi",
 					"xquare addon create cache redis --storage 500Mi",
+					"xquare addon create my-storage seaweedfs --buckets uploads,thumbnails --storage 2Gi",
 				},
 			},
 			{
