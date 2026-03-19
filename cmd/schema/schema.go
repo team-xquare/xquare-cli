@@ -326,7 +326,7 @@ func envSchema() CommandSchema {
 			},
 			{
 				Command:     "env set <app> KEY=VALUE ...",
-				Description: "Set environment variables (merges with existing by default). Use --replace --yes to overwrite all.",
+				Description: "Set environment variables (merges with existing by default). Use --replace --yes to overwrite all. NOTE: frontend apps (react/vite/vue/nextjs/nextjs-export) bake env vars at build time — a new build is required after set for changes to take effect. Backend apps inject at runtime via Vault, no rebuild needed.",
 				Args: []ArgSchema{
 					{Name: "app", Required: true},
 					{Name: "KEY=VALUE", Required: true, Desc: "one or more key=value pairs"},

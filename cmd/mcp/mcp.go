@@ -204,7 +204,11 @@ DEPLOYMENT FLOW after create_app:
 1. Wait ~2-3 minutes for CI infrastructure to initialize (ciReady=true in get_app_status)
 2. If code is already on GitHub (was pushed before this app was created): call trigger ONCE — the webhook missed the commit
 3. If code will be pushed after this step: just git push — CI runs automatically, do NOT call trigger
-4. For ALL subsequent deployments: git push → CI runs automatically — ⛔ NEVER call trigger after a git push`),
+4. For ALL subsequent deployments: git push → CI runs automatically — ⛔ NEVER call trigger after a git push
+
+ENV VARS NOTE:
+- Frontend build types (react/vite/vue/nextjs/nextjs-export): env vars are injected at BUILD TIME from Vault. Set them with set_env before triggering a build.
+- All other build types: env vars are injected at runtime from Vault. No rebuild required after set_env.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name: lowercase, hyphens ok, 2-63 chars")),
 				mcp.WithString("build_type", mcp.Required(), mcp.Description("gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),
@@ -443,7 +447,11 @@ BEFORE calling this tool you MUST:
 			})
 
 			s.AddTool(mcp.NewTool("set_env",
-				mcp.WithDescription("Set environment variables for an app (merges with existing, does NOT delete unspecified keys). Use delete_env to remove specific keys."),
+				mcp.WithDescription(`Set environment variables for an app (merges with existing, does NOT delete unspecified keys). Use delete_env to remove specific keys.
+
+ENV INJECTION TIMING:
+- Backend apps (gradle/nodejs/go/etc): injected at runtime via Vault — takes effect on next deploy, no rebuild needed.
+- Frontend apps (react/vite/vue/nextjs/nextjs-export): injected at BUILD TIME — env vars are baked into the static bundle during CI. After set_env, you must trigger a new build (git push or trigger) for changes to take effect.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 				mcp.WithString("vars", mcp.Required(), mcp.Description(`JSON object of key-value pairs. Example: {"DB_HOST":"localhost","DB_PORT":"5432"}`)),
