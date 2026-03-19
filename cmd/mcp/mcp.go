@@ -221,7 +221,17 @@ ENV VARS NOTE:
 - gradle: {"javaVersion":"17","buildCommand":"./gradlew bootJar","jarOutputPath":"/build/libs/*.jar"}
 - nodejs:  {"nodeVersion":"20","buildCommand":"npm install","startCommand":"npm start"}
 - go:      {"goVersion":"1.23","buildCommand":"go build -o app .","binaryName":"app"}
-- docker:  {"dockerfilePath":"./Dockerfile","contextPath":"."}`)),
+- docker:  {"dockerfilePath":"./Dockerfile","contextPath":"."}
+
+CUSTOM DOCKERFILE — BUILD-TIME ENV VARS:
+CI passes Vault KV secrets as --secret id=vault_env automatically. Only needed if the build requires env vars at build time (e.g. frontend frameworks baking API URLs). Server-side apps get env vars at runtime via Vault — no Dockerfile change needed.
+
+Minimal implementation in the user's Dockerfile:
+  RUN --mount=type=secret,id=vault_env \
+    if [ -f /run/secrets/vault_env ]; then set -a; . /run/secrets/vault_env; set +a; fi && \
+    <build command>
+
+/run/secrets/vault_env = KEY=VALUE lines sourced at build time, leaves no trace in image history.`)),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				project, err := req.RequireString("project")
 				if err != nil {
