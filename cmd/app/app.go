@@ -119,8 +119,9 @@ func newListCmd() *cobra.Command {
 				}
 				statusStr, instances := "unknown", "-"
 				if r.err == nil && r.status != nil {
-					statusStr = fmt.Sprintf("%v", r.status["status"])
-					if statusStr != "not_deployed" {
+					rawStatus := fmt.Sprintf("%v", r.status["status"])
+					statusStr = formatAppStatus(rawStatus)
+					if rawStatus != "not_deployed" {
 						if sc, ok := r.status["scale"].(map[string]any); ok {
 							instances = fmt.Sprintf("%v/%v", sc["running"], sc["desired"])
 						}
@@ -997,4 +998,22 @@ func endpointRows(a map[string]any) [][]string {
 		}
 	}
 	return rows
+}
+
+// formatAppStatus converts internal K8s status strings to human-readable labels.
+func formatAppStatus(s string) string {
+	switch s {
+	case "running":
+		return "running"
+	case "pending":
+		return "pending"
+	case "failed":
+		return "failed"
+	case "stopped":
+		return "stopped"
+	case "not_deployed":
+		return "not deployed"
+	default:
+		return s
+	}
 }

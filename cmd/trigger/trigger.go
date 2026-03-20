@@ -105,7 +105,7 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 					output.Info("  [2/3] waiting for ArgoCD sync...")
 					phase = "syncing"
 				case "failed":
-					return fmt.Errorf("build failed\n\n  xquare logs %s --build --build-id %s", app, buildID)
+					return fmt.Errorf("build failed\n\n  xquare logs %s --build --build-id %s   # view build logs\n  xquare logs %s            # view runtime logs", app, buildID, app)
 				default:
 					printOnce(fmt.Sprintf("  [1/3] building...  [%s]", buildID))
 				}

@@ -803,6 +803,19 @@ CI pipeline must be ready (ciReady=true in get_app_status) before calling trigge
 				defer resp.Body.Close()
 				if resp.StatusCode >= 400 {
 					b, _ := io.ReadAll(resp.Body)
+					var e struct {
+						Error string `json:"error"`
+						Code  string `json:"code"`
+					}
+					if jerr := json.Unmarshal(b, &e); jerr == nil && e.Error != "" {
+						errMsg := e.Error
+						if e.Code == "not_deployed" {
+							errMsg += "\n\nThe app has not been deployed yet. Use the trigger tool to start the first deployment."
+						} else if e.Code == "start_timeout" {
+							errMsg += "\n\nThe app pod did not start within 3 minutes. Check app status with get_app_status and build logs with get_build_logs."
+						}
+						return mcp.NewToolResultError(errMsg), nil
+					}
 					return mcp.NewToolResultError(fmt.Sprintf("server error %d: %s", resp.StatusCode, string(b))), nil
 				}
 				var lines []string
