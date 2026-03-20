@@ -310,7 +310,6 @@ func newAddonGetCmd() *cobra.Command {
 						"type":        addonType,
 						"host":        addonName,
 						"port":        conn["port"],
-						"tunnelReady": conn["tunnelReady"],
 						"dashboard":   dashURL,
 						"buckets":     buckets,
 					})
@@ -339,8 +338,6 @@ func newAddonGetCmd() *cobra.Command {
 					"type":        addonType,
 					"host":        addonName,
 					"port":        conn["port"],
-					"password":    conn["password"],
-					"tunnelReady": conn["tunnelReady"],
 					"dashboard":   dashURL,
 				})
 			}
