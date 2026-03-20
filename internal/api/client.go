@@ -160,6 +160,9 @@ func parseError(resp *http.Response) error {
 		if e.InstallURL != "" {
 			return fmt.Errorf("%s\n\nInstall the GitHub App at: %s", e.Error, e.InstallURL)
 		}
+		if e.Code == "token_expired" {
+			return fmt.Errorf("session expired — please log in again\n\n  xquare login   # re-authenticate with GitHub")
+		}
 		if e.Code == "not_authorized" {
 			return fmt.Errorf("access not granted\n\nYour GitHub account has not been added to this platform.\nAsk a platform admin to run:\n\n  xquare admin allowlist add <your-github-username>")
 		}
@@ -187,6 +190,16 @@ type AuthResponse struct {
 func (c *Client) AuthGitHub(ctx context.Context, code string) (*AuthResponse, error) {
 	var out AuthResponse
 	return &out, c.post(ctx, "/auth/github/callback", map[string]string{"code": code}, &out)
+}
+
+type MeResponse struct {
+	GithubID int64  `json:"github_id"`
+	Username string `json:"username"`
+}
+
+func (c *Client) GetMe(ctx context.Context) (*MeResponse, error) {
+	var out MeResponse
+	return &out, c.get(ctx, "/auth/me", &out)
 }
 
 // Projects

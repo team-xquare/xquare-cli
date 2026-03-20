@@ -3,9 +3,11 @@ package auth
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/team-xquare/xquare-cli/internal/api"
 	"github.com/team-xquare/xquare-cli/internal/config"
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
@@ -72,23 +74,51 @@ func newAuthStatusCmd() *cobra.Command {
 				os.Exit(3)
 			}
 			username := ""
+			serverURL := ""
 			if cfg != nil {
 				username = cfg.Username
+				serverURL = cfg.ServerURL
 			}
 			via := "config file"
 			if os.Getenv("XQUARE_TOKEN") != "" {
 				via = "XQUARE_TOKEN env var"
 			}
+			// Verify the token is still valid by calling /auth/me
+			tokenValid := true
+			tokenExpired := false
+			if serverURL != "" {
+				c := api.New(serverURL, token)
+				if me, err := c.GetMe(cmd.Context()); err != nil {
+					if strings.Contains(err.Error(), "session expired") || strings.Contains(err.Error(), "token_expired") {
+						tokenValid = false
+						tokenExpired = true
+					} else {
+						// Network error or server unavailable — don't mark as invalid
+						tokenValid = true
+					}
+				} else if me.Username != "" {
+					// Server confirmed identity; use server's username as authoritative
+					username = me.Username
+				}
+			}
 			if isJSON, _ := cmd.Root().PersistentFlags().GetBool("json"); isJSON {
-				return output.JSON(map[string]any{
-					"logged_in": true,
+				m := map[string]any{
+					"logged_in": tokenValid,
 					"username":  username,
 					"via":       via,
-					"server":    cfg.ServerURL,
-				})
+					"server":    serverURL,
+				}
+				if tokenExpired {
+					m["expired"] = true
+				}
+				return output.JSON(m)
+			}
+			if !tokenValid {
+				output.Warn("session expired — run: xquare login")
+				os.Exit(3)
 			}
 			fmt.Printf("logged in as %s (via %s)\n", username, via)
-			fmt.Printf("server: %s\n", cfg.ServerURL)
+			fmt.Printf("server: %s\n", serverURL)
 			return nil
 		},
 	}

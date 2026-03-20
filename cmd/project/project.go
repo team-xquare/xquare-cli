@@ -285,16 +285,21 @@ func newMembersCmd() *cobra.Command {
 }
 
 func newMembersAddCmd() *cobra.Command {
-	return &cobra.Command{
+	var dryRun bool
+	cmd := &cobra.Command{
 		Use:   "add <github-username>",
 		Short: "Add a member to the project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c := api.FromCmd(cmd)
 			project, err := api.RequireProject(cmd)
 			if err != nil {
 				return err
 			}
+			if dryRun {
+				output.Info(fmt.Sprintf("[dry-run] would add %s to project %s", args[0], project))
+				return nil
+			}
+			c := api.FromCmd(cmd)
 			if err := c.AddMember(cmd.Context(), project, args[0]); err != nil {
 				return err
 			}
@@ -302,6 +307,8 @@ func newMembersAddCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen without making changes")
+	return cmd
 }
 
 func newProjectDashboardCmd() *cobra.Command {
