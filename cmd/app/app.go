@@ -124,7 +124,15 @@ func newListCmd() *cobra.Command {
 				statusStr, instances := "unknown", "-"
 				if r.err == nil && r.status != nil {
 					rawStatus := fmt.Sprintf("%v", r.status["status"])
+					deployPhase := fmt.Sprintf("%v", r.status["deployPhase"])
 					statusStr = formatAppStatus(rawStatus)
+					// Annotate with deploy phase for in-progress states
+					switch deployPhase {
+					case "building":
+						statusStr = statusStr + " (building)"
+					case "syncing":
+						statusStr = statusStr + " (syncing)"
+					}
 					if rawStatus != "not_deployed" {
 						if sc, ok := r.status["scale"].(map[string]any); ok {
 							instances = fmt.Sprintf("%v/%v", sc["running"], sc["desired"])

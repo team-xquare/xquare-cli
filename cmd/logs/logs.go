@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
 	"time"
 
@@ -168,6 +169,22 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 			continue
 		}
 
+		if resp.StatusCode == http.StatusAccepted {
+			// Build is still initializing (container not started yet) — treat like a retry.
+			var body struct {
+				Message string `json:"message"`
+			}
+			_ = json.NewDecoder(resp.Body).Decode(&body)
+			resp.Body.Close()
+			if attempt == maxRetries {
+				return fmt.Errorf("build initializing — logs not available yet\n\n  xquare app status %s   # check build status", appName)
+			}
+			if !printed {
+				output.Info("  waiting for build to start...")
+			}
+			time.Sleep(3 * time.Second)
+			continue
+		}
 		if resp.StatusCode >= 400 {
 			resp.Body.Close()
 			if attempt == maxRetries {
