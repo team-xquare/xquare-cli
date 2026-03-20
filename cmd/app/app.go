@@ -290,6 +290,9 @@ func newStatusCmd() *cobra.Command {
 				rows = append(rows, []string{"Last Build", fmt.Sprintf("%s  [%s]%s", lbStatus, lbID, lbTime)})
 			}
 
+			if msg := fmt.Sprintf("%v", status["message"]); msg != "" && msg != "<nil>" {
+				rows = append(rows, []string{"Message", msg})
+			}
 			if inst, ok := status["instances"].([]any); ok {
 				for i, instance := range inst {
 					if p, ok := instance.(map[string]any); ok {
@@ -299,7 +302,11 @@ func newStatusCmd() *cobra.Command {
 								sinceStr = fmt.Sprintf("  up %s", time.Since(t).Round(time.Second))
 							}
 						}
-						rows = append(rows, []string{fmt.Sprintf("Instance %d", i+1), fmt.Sprintf("status=%v  restarts=%v%s", p["status"], p["restarts"], sinceStr)})
+						reasonStr := ""
+						if r := fmt.Sprintf("%v", p["reason"]); r != "" && r != "<nil>" {
+							reasonStr = fmt.Sprintf("  (%s)", r)
+						}
+						rows = append(rows, []string{fmt.Sprintf("Instance %d", i+1), fmt.Sprintf("status=%v  restarts=%v%s%s", p["status"], p["restarts"], reasonStr, sinceStr)})
 					}
 				}
 			}
