@@ -92,6 +92,19 @@ func newEnvGetCmd() *cobra.Command {
 				return err
 			}
 			if api.IsJSON(cmd) {
+				if !reveal {
+					// Apply the same sensitive-key masking as the human table view.
+					// Use --reveal to get plaintext values in JSON output.
+					masked := make(map[string]string, len(envs))
+					for k, v := range envs {
+						if isSensitiveKey(k) {
+							masked[k] = "***"
+						} else {
+							masked[k] = v
+						}
+					}
+					return output.JSON(masked)
+				}
 				return output.JSON(envs)
 			}
 			if len(envs) == 0 {

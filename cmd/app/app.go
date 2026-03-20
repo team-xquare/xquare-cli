@@ -65,10 +65,14 @@ func newListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if api.IsJSON(cmd) {
+			// When --json without --status: return static config only (fast path).
+			if api.IsJSON(cmd) && !withStatus {
 				return output.JSON(apps)
 			}
 			if len(apps) == 0 {
+				if api.IsJSON(cmd) {
+					return output.JSON([]map[string]any{})
+				}
 				output.Info("no apps found")
 				return nil
 			}
@@ -112,6 +116,24 @@ func newListCmd() *cobra.Command {
 				}(i, a)
 			}
 			wg.Wait()
+			// When --json --status: return enriched JSON with live status merged into each app object.
+			if api.IsJSON(cmd) {
+				enriched := make([]map[string]any, 0, len(apps))
+				for i, a := range apps {
+					r := results[i]
+					entry := make(map[string]any, len(a)+3)
+					for k, v := range a {
+						entry[k] = v
+					}
+					if r.err == nil && r.status != nil {
+						entry["status"] = r.status["status"]
+						entry["deployPhase"] = r.status["deployPhase"]
+						entry["scale"] = r.status["scale"]
+					}
+					enriched = append(enriched, entry)
+				}
+				return output.JSON(enriched)
+			}
 			rows := make([][]string, 0, len(apps))
 			for i, r := range results {
 				a := apps[i]
