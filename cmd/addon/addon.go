@@ -275,6 +275,9 @@ func newAddonGetCmd() *cobra.Command {
 			addonName := args[0]
 			conn, err := c.GetAddonConnection(cmd.Context(), project, addonName)
 			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					return fmt.Errorf("addon %q not found in project %q\n\n  xquare addon list --project %s   # list available addons", addonName, project, project)
+				}
 				return err
 			}
 			delete(conn, "host")
@@ -372,6 +375,9 @@ func newAddonConnectCmd() *cobra.Command {
 
 			conn, err := c.GetAddonConnection(cmd.Context(), project, addonName)
 			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					return fmt.Errorf("addon %q not found in project %q\n\n  xquare addon list --project %s   # list available addons", addonName, project, project)
+				}
 				return fmt.Errorf("get connection info: %w", err)
 			}
 
@@ -441,6 +447,9 @@ func newAddonTunnelCmd() *cobra.Command {
 
 			conn, err := c.GetAddonConnection(cmd.Context(), project, addonName)
 			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					return fmt.Errorf("addon %q not found in project %q\n\n  xquare addon list --project %s   # list available addons", addonName, project, project)
+				}
 				return fmt.Errorf("get connection info: %w", err)
 			}
 

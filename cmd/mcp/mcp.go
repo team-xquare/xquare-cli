@@ -310,7 +310,9 @@ Minimal implementation in the user's Dockerfile:
 			s.AddTool(mcp.NewTool("update_app",
 				mcp.WithDescription(`Update application configuration. Only specified fields are changed.
 
-Updatable fields: build_type, endpoints, github_branch, github_owner, github_repo, trigger_paths, build_options`),
+Updatable fields: build_type, endpoints, github_branch, github_owner, github_repo, trigger_paths, build_options
+
+NOTE on build_options: you can provide build_options alone (without build_type) to tune the existing build config — the current build type is preserved and only the specified fields are overridden. If build_type is also specified, the build config is replaced with the new type + build_options.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 				mcp.WithString("build_type", mcp.Description("New build type: gradle|nodejs|react|vite|vue|nextjs|nextjs-export|go|rust|maven|django|flask|docker")),
@@ -319,7 +321,7 @@ Updatable fields: build_type, endpoints, github_branch, github_owner, github_rep
 				mcp.WithString("github_owner", mcp.Description("New GitHub org or user name")),
 				mcp.WithString("github_repo", mcp.Description("New GitHub repository name")),
 				mcp.WithString("trigger_paths", mcp.Description("Comma-separated CI trigger paths, e.g. src/**,Dockerfile")),
-				mcp.WithString("build_options", mcp.Description("JSON object of build-type specific options")),
+				mcp.WithString("build_options", mcp.Description("JSON object of build-type specific options to override (e.g. change javaVersion or buildCommand without switching build type)")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				project, err := req.RequireString("project")
 				if err != nil {
@@ -337,14 +339,40 @@ Updatable fields: build_type, endpoints, github_branch, github_owner, github_rep
 				body := existing
 				body["name"] = appName
 
+				boStr := req.GetString("build_options", "")
 				if bt := req.GetString("build_type", ""); bt != "" {
+					// Explicit build type change: replace build config entirely
 					buildOpts := map[string]any{}
-					if boStr := req.GetString("build_options", ""); boStr != "" {
+					if boStr != "" {
 						if e := json.Unmarshal([]byte(boStr), &buildOpts); e != nil {
 							return mcp.NewToolResultError("invalid build_options JSON: " + e.Error()), nil
 						}
 					}
 					body["build"] = map[string]any{bt: buildOpts}
+				} else if boStr != "" {
+					// No build type change: apply build_options onto the existing build type
+					var buildOpts map[string]any
+					if e := json.Unmarshal([]byte(boStr), &buildOpts); e != nil {
+						return mcp.NewToolResultError("invalid build_options JSON: " + e.Error()), nil
+					}
+					// existing["buildType"] is the inferred top-level field from the server
+					currentBT := fmt.Sprintf("%v", existing["buildType"])
+					if currentBT == "" || currentBT == "<nil>" {
+						return mcp.NewToolResultError("cannot apply build_options: app has no build type set; specify build_type explicitly"), nil
+					}
+					// Merge build_options into the existing build spec for that type
+					existingBuild, _ := existing["build"].(map[string]any)
+					if existingBuild == nil {
+						existingBuild = map[string]any{}
+					}
+					existingTypeOpts, _ := existingBuild[currentBT].(map[string]any)
+					if existingTypeOpts == nil {
+						existingTypeOpts = map[string]any{}
+					}
+					for k, v := range buildOpts {
+						existingTypeOpts[k] = v
+					}
+					body["build"] = map[string]any{currentBT: existingTypeOpts}
 				}
 
 				if epStr := req.GetString("endpoints", ""); epStr != "" {
