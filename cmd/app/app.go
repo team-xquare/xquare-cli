@@ -631,7 +631,7 @@ func newDeleteCmd() *cobra.Command {
 				return nil
 			}
 			if !yes {
-				return fmt.Errorf("use --yes to confirm deletion of app %s", args[0])
+				return fmt.Errorf("use --yes to confirm deletion of app %q from project %q\n\nWarning: this will permanently delete the app and all its environment variables", args[0], project)
 			}
 			c := api.FromCmd(cmd)
 			if err := c.DeleteApp(cmd.Context(), project, args[0]); err != nil {

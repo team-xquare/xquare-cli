@@ -245,7 +245,7 @@ func newAddonDeleteCmd() *cobra.Command {
 				return nil
 			}
 			if !yes {
-				return fmt.Errorf("use --yes to confirm deletion")
+				return fmt.Errorf("use --yes to confirm deletion of addon %q from project %q\n\nWarning: this will permanently delete the addon and its persistent volume", args[0], project)
 			}
 			c := api.FromCmd(cmd)
 			if err := c.DeleteAddon(cmd.Context(), project, args[0]); err != nil {

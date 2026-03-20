@@ -48,6 +48,15 @@ Use trigger only when:
 			}
 
 			buildID := fmt.Sprintf("%v", result["build"])
+
+			if api.IsJSON(cmd) {
+				return output.JSON(map[string]string{
+					"project": project,
+					"app":     appName,
+					"build":   buildID,
+				})
+			}
+
 			output.Success(fmt.Sprintf("build started: %s/%s  [%s]", project, appName, buildID))
 
 			if watch {
