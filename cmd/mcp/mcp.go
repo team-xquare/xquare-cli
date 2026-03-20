@@ -940,6 +940,10 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 					return mcp.NewToolResultError(err.Error()), nil
 				}
 				defer resp.Body.Close()
+				if resp.StatusCode == 202 {
+					// Build pod is still initializing — return a clear error instead of the JSON body.
+					return mcp.NewToolResultError("build is still initializing — wait 20-30 seconds and call get_build_logs again"), nil
+				}
 				if resp.StatusCode >= 400 {
 					b, _ := io.ReadAll(resp.Body)
 					return mcp.NewToolResultError(fmt.Sprintf("server error %d: %s", resp.StatusCode, string(b))), nil

@@ -291,7 +291,10 @@ func newEnvPushCmd() *cobra.Command {
 
 			f, err := os.Open(inputFile)
 			if err != nil {
-				return err
+				if os.IsNotExist(err) {
+					return fmt.Errorf("file not found: %s\n\n  xquare env pull %s -o %s   # pull current env vars to a file first", inputFile, appName, inputFile)
+				}
+				return fmt.Errorf("open %s: %w", inputFile, err)
 			}
 			defer f.Close()
 
@@ -334,6 +337,10 @@ func newEnvPushCmd() *cobra.Command {
 			}
 			if err := scanner.Err(); err != nil {
 				return err
+			}
+
+			if len(envs) == 0 {
+				return fmt.Errorf("no environment variables found in %s\n\nEnsure the file contains KEY=VALUE lines (comments starting with # are ignored)", inputFile)
 			}
 
 			if replace && !yes && !dryRun {
