@@ -170,13 +170,17 @@ func newGetCmd() *cobra.Command {
 			rows := [][]string{{"Name", args[0]}}
 			if gh, ok := a["github"].(map[string]any); ok {
 				rows = append(rows, []string{"GitHub", fmt.Sprintf("%v/%v@%v", gh["owner"], gh["repo"], gh["branch"])})
-			}
-			// Build type
-			if build, ok := a["build"].(map[string]any); ok {
-				for buildType := range build {
-					rows = append(rows, []string{"Build Type", buildType})
-					break
+				if hash := fmt.Sprintf("%v", gh["hash"]); hash != "" && hash != "<nil>" {
+					short := hash
+					if len(short) > 8 {
+						short = short[:8]
+					}
+					rows = append(rows, []string{"Version", short})
 				}
+			}
+			// Build type — use top-level buildType field (added in PR#51)
+			if bt := fmt.Sprintf("%v", a["buildType"]); bt != "" && bt != "<nil>" {
+				rows = append(rows, []string{"Build Type", bt})
 			}
 			for _, row := range endpointRows(a) {
 				rows = append(rows, row)
@@ -278,7 +282,13 @@ func newStatusCmd() *cobra.Command {
 			if inst, ok := status["instances"].([]any); ok {
 				for i, instance := range inst {
 					if p, ok := instance.(map[string]any); ok {
-						rows = append(rows, []string{fmt.Sprintf("Instance %d", i+1), fmt.Sprintf("status=%v  restarts=%v", p["status"], p["restarts"])})
+						sinceStr := ""
+						if since := fmt.Sprintf("%v", p["since"]); since != "" && since != "<nil>" {
+							if t, err := time.Parse("2006-01-02T15:04:05Z", since); err == nil {
+								sinceStr = fmt.Sprintf("  up %s", time.Since(t).Round(time.Second))
+							}
+						}
+						rows = append(rows, []string{fmt.Sprintf("Instance %d", i+1), fmt.Sprintf("status=%v  restarts=%v%s", p["status"], p["restarts"], sinceStr)})
 					}
 				}
 			}
