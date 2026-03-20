@@ -20,7 +20,8 @@ func NewBuildCmd() *cobra.Command {
 }
 
 func newBuildListCmd() *cobra.Command {
-	return &cobra.Command{
+	var limit int
+	cmd := &cobra.Command{
 		Use:     "list <app>",
 		Short:   "List recent CI/CD builds for an app",
 		Aliases: []string{"ls"},
@@ -35,6 +36,10 @@ func newBuildListCmd() *cobra.Command {
 			builds, err := c.ListBuilds(cmd.Context(), project, appName)
 			if err != nil {
 				return err
+			}
+			// Apply client-side limit (server returns up to 50)
+			if limit > 0 && len(builds) > limit {
+				builds = builds[:limit]
 			}
 			if api.IsJSON(cmd) {
 				return output.JSON(builds)
@@ -63,4 +68,6 @@ func newBuildListCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().IntVarP(&limit, "limit", "l", 10, "maximum number of builds to show (0 = all, max 50)")
+	return cmd
 }

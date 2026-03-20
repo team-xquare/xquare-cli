@@ -14,6 +14,11 @@ import (
 	"github.com/team-xquare/xquare-cli/internal/output"
 )
 
+// isCI returns true when running in a CI environment (CI=true env var).
+func isCI() bool {
+	return strings.EqualFold(os.Getenv("CI"), "true")
+}
+
 func NewEnvCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "env",
@@ -152,8 +157,10 @@ func newEnvSetCmd() *cobra.Command {
 				envs[key] = parts[1]
 			}
 
-			if replace && !yes && !dryRun {
-				return fmt.Errorf("--replace deletes ALL existing env vars\n\n  use --yes to confirm, or --dry-run to preview")
+			// In CI mode (CI=true), --replace is automatically confirmed to allow
+			// non-interactive pipeline usage without requiring --yes.
+			if replace && !yes && !dryRun && !isCI() {
+				return fmt.Errorf("--replace deletes ALL existing env vars\n\n  use --yes to confirm, or --dry-run to preview\n  (in CI: set CI=true to auto-confirm)")
 			}
 
 			if dryRun {
@@ -355,8 +362,9 @@ func newEnvPushCmd() *cobra.Command {
 				return fmt.Errorf("no environment variables found in %s\n\nEnsure the file contains KEY=VALUE lines (comments starting with # are ignored)", inputFile)
 			}
 
-			if replace && !yes && !dryRun {
-				return fmt.Errorf("--replace deletes ALL existing env vars\n\n  use --yes to confirm, or --dry-run to preview")
+			// In CI mode (CI=true), --replace is automatically confirmed.
+			if replace && !yes && !dryRun && !isCI() {
+				return fmt.Errorf("--replace deletes ALL existing env vars\n\n  use --yes to confirm, or --dry-run to preview\n  (in CI: set CI=true to auto-confirm)")
 			}
 
 			if dryRun {
