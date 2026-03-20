@@ -265,7 +265,14 @@ func newStatusCmd() *cobra.Command {
 			if lb, ok := status["lastBuild"].(map[string]any); ok && lb != nil {
 				lbID := fmt.Sprintf("%v", lb["id"])
 				lbStatus := fmt.Sprintf("%v", lb["status"])
-				rows = append(rows, []string{"Last Build", fmt.Sprintf("%s  [%s]", lbStatus, lbID)})
+				lbTime := ""
+				if startedAt := fmt.Sprintf("%v", lb["startedAt"]); startedAt != "" && startedAt != "<nil>" {
+					if t, err := time.Parse(time.RFC3339, startedAt); err == nil {
+						elapsed := time.Since(t).Round(time.Second)
+						lbTime = fmt.Sprintf("  (%s ago)", elapsed)
+					}
+				}
+				rows = append(rows, []string{"Last Build", fmt.Sprintf("%s  [%s]%s", lbStatus, lbID, lbTime)})
 			}
 
 			if inst, ok := status["instances"].([]any); ok {

@@ -70,6 +70,12 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 	phase := "building"
 	lastMsg := ""
 	failCount := 0
+	// preVersion is the deployment image hash before the build started.
+	// Used in the syncing phase to detect when ArgoCD has rolled out the new image.
+	preVersion := ""
+	if st, err := c.GetAppStatus(cmd.Context(), project, app); err == nil {
+		preVersion = fmt.Sprintf("%v", st["version"])
+	}
 
 	printOnce := func(msg string) {
 		if msg != lastMsg {
@@ -115,7 +121,13 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 				if err != nil {
 					continue
 				}
-				if fmt.Sprintf("%v", status["status"]) != "not_deployed" {
+				curVersion := fmt.Sprintf("%v", status["version"])
+				curStatus := fmt.Sprintf("%v", status["status"])
+				// Transition when: app just became deployed (was not_deployed before) OR
+				// version hash changed (re-deploy: new image rolled out by ArgoCD).
+				versionChanged := curVersion != "" && curVersion != "<nil>" && curVersion != preVersion
+				wasNotDeployed := preVersion == "" || preVersion == "<nil>"
+				if versionChanged || (wasNotDeployed && curStatus != "not_deployed") {
 					phase = "deploying"
 				}
 
