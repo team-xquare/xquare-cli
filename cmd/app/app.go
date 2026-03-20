@@ -75,13 +75,17 @@ func newListCmd() *cobra.Command {
 				rows := make([][]string, 0, len(apps))
 				for _, a := range apps {
 					name := fmt.Sprintf("%v", a["name"])
+					buildType := fmt.Sprintf("%v", a["buildType"])
+					if buildType == "<nil>" || buildType == "" {
+						buildType = "-"
+					}
 					github := ""
 					if gh, ok := a["github"].(map[string]any); ok {
 						github = fmt.Sprintf("%v/%v@%v", gh["owner"], gh["repo"], gh["branch"])
 					}
-					rows = append(rows, []string{name, github})
+					rows = append(rows, []string{name, buildType, github})
 				}
-				output.Table([]string{"NAME", "GITHUB"}, rows)
+				output.Table([]string{"NAME", "BUILD TYPE", "GITHUB"}, rows)
 				return nil
 			}
 			// Parallel status fetch

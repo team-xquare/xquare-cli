@@ -112,7 +112,16 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 		}
 		buildID = fmt.Sprintf("%v", builds[0]["id"])
 		buildStatus := fmt.Sprintf("%v", builds[0]["status"])
-		output.Info(fmt.Sprintf("build: %s  [%s]", buildID, buildStatus))
+		startedAt := fmt.Sprintf("%v", builds[0]["startedAt"])
+		// Format startedAt to a local-friendly relative time if parseable
+		startedStr := ""
+		if startedAt != "" && startedAt != "<nil>" {
+			if t, err := time.Parse(time.RFC3339, startedAt); err == nil {
+				elapsed := time.Since(t).Round(time.Second)
+				startedStr = fmt.Sprintf("  started %s ago", elapsed)
+			}
+		}
+		output.Info(fmt.Sprintf("build: %s  [%s]%s", buildID, buildStatus, startedStr))
 	}
 
 	// Auto-reconnect loop for running/pending builds

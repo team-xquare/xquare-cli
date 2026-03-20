@@ -29,8 +29,27 @@ func NewEnvCmd() *cobra.Command {
 	return cmd
 }
 
+// sensitiveKeyPatterns lists substrings that indicate a sensitive env key.
+// Values with these keys are masked by default (shown as ***) unless --reveal is set.
+var sensitiveKeyPatterns = []string{
+	"PASSWORD", "PASSWD", "SECRET", "TOKEN", "KEY", "CREDENTIAL",
+	"PRIVATE", "API_KEY", "AUTH", "DSN", "DATABASE_URL", "JDBC",
+}
+
+// isSensitiveKey returns true if the key looks like it contains credentials.
+func isSensitiveKey(key string) bool {
+	upper := strings.ToUpper(key)
+	for _, pat := range sensitiveKeyPatterns {
+		if strings.Contains(upper, pat) {
+			return true
+		}
+	}
+	return false
+}
+
 func newEnvGetCmd() *cobra.Command {
-	return &cobra.Command{
+	var reveal bool
+	cmd := &cobra.Command{
 		Use:     "get <app>",
 		Short:   "Show environment variables",
 		Aliases: []string{"list", "ls"},
@@ -58,14 +77,25 @@ func newEnvGetCmd() *cobra.Command {
 				keys = append(keys, k)
 			}
 			sort.Strings(keys)
+			maskedCount := 0
 			rows := make([][]string, 0, len(envs))
 			for _, k := range keys {
-				rows = append(rows, []string{k, envs[k]})
+				v := envs[k]
+				if !reveal && isSensitiveKey(k) {
+					v = "***"
+					maskedCount++
+				}
+				rows = append(rows, []string{k, v})
 			}
 			output.Table([]string{"KEY", "VALUE"}, rows)
+			if maskedCount > 0 {
+				output.Info(fmt.Sprintf("(%d sensitive value(s) masked — use --reveal to show)", maskedCount))
+			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&reveal, "reveal", false, "show sensitive values (passwords, tokens, keys)")
+	return cmd
 }
 
 // set: default is MERGE (patch). Use --replace for full replace.
@@ -267,17 +297,19 @@ func newEnvPushCmd() *cobra.Command {
 					continue
 				}
 				v := strings.TrimSpace(parts[1])
-				// Unquote double-quoted values using strconv.Unquote so that escape
-				// sequences like \n, \t, \" are handled correctly. Fall back to the
-				// raw (trimmed) value if not a valid Go quoted literal.
+				// Unquote quoted values:
+				// - Double-quoted: use strconv.Unquote so escape sequences (\n, \t, \") work.
+				//   Fall back to stripping quotes on failure (unescaped inner quote).
+				// - Single-quoted: treated as literal (no escape sequences), just strip quotes.
 				if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
 					if unquoted, err := strconv.Unquote(v); err == nil {
 						v = unquoted
 					} else {
-						// Unquote failed (e.g. unescaped quote inside): strip surrounding
-						// quotes as best-effort fallback.
 						v = v[1 : len(v)-1]
 					}
+				} else if len(v) >= 2 && v[0] == '\'' && v[len(v)-1] == '\'' {
+					// Single-quoted: strip surrounding quotes, no escape processing.
+					v = v[1 : len(v)-1]
 				}
 				envs[k] = v
 			}
