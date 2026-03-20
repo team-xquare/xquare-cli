@@ -186,8 +186,15 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 			continue
 		}
 		if resp.StatusCode >= 400 {
+			var e struct {
+				Error string `json:"error"`
+			}
+			_ = json.NewDecoder(resp.Body).Decode(&e)
 			resp.Body.Close()
 			if attempt == maxRetries {
+				if e.Error != "" {
+					return fmt.Errorf("%s", e.Error)
+				}
 				return fmt.Errorf("server error: %d", resp.StatusCode)
 			}
 			continue

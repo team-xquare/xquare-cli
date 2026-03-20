@@ -254,11 +254,15 @@ func newMembersCmd() *cobra.Command {
 				output.Info("no members found")
 				return nil
 			}
-			rows := make([][]string, len(members))
-			for i, m := range members {
-				rows[i] = []string{m.Username, fmt.Sprintf("%d", m.ID)}
+			rows := make([][]string, 0, len(members))
+			for _, m := range members {
+				name := m.Username
+				if name == "" {
+					name = fmt.Sprintf("(id:%d)", m.ID)
+				}
+				rows = append(rows, []string{name})
 			}
-			output.Table([]string{"USERNAME", "GITHUB ID"}, rows)
+			output.Table([]string{"USERNAME"}, rows)
 			return nil
 		},
 	}
