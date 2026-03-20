@@ -501,12 +501,20 @@ ENV INJECTION TIMING:
 				if e := json.Unmarshal([]byte(keysStr), &keys); e != nil {
 					return mcp.NewToolResultError("invalid keys JSON: " + e.Error()), nil
 				}
+				var errs []string
+				deleted := 0
 				for _, k := range keys {
 					if e := client.DeleteEnvKey(ctx, project, app, k); e != nil {
-						return mcp.NewToolResultError(fmt.Sprintf("delete %s: %s", k, e.Error())), nil
+						errs = append(errs, fmt.Sprintf("%s: %s", k, e.Error()))
+					} else {
+						deleted++
 					}
 				}
-				return mcp.NewToolResultText(fmt.Sprintf("deleted %d env key(s)", len(keys))), nil
+				if len(errs) > 0 {
+					msg := fmt.Sprintf("deleted %d env key(s); failed to delete %d:\n  %s", deleted, len(errs), strings.Join(errs, "\n  "))
+					return mcp.NewToolResultError(msg), nil
+				}
+				return mcp.NewToolResultText(fmt.Sprintf("deleted %d env key(s)", deleted)), nil
 			})
 
 			// ── Addon tools ───────────────────────────────────────────────
