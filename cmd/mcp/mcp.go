@@ -461,7 +461,12 @@ BEFORE calling this tool you MUST:
 
 ENV INJECTION TIMING:
 - Backend apps (gradle/nodejs/go/etc): injected at runtime via Vault — takes effect on next deploy, no rebuild needed.
-- Frontend apps (react/vite/vue/nextjs/nextjs-export): injected at BUILD TIME — env vars are baked into the static bundle during CI. After set_env, you must trigger a new build (git push or trigger) for changes to take effect.`),
+- Frontend apps (react/vite/vue/nextjs/nextjs-export): injected at BUILD TIME — env vars are baked into the static bundle during CI. After set_env, you must trigger a new build (git push or trigger) for changes to take effect.
+- Custom Dockerfile (docker build type): ⚠️  CI passes --secret id=vault_env to buildx automatically, but the Dockerfile itself MUST mount it explicitly. A rebuild alone is NOT enough — you must modify the RUN instruction in the user's Dockerfile:
+    RUN --mount=type=secret,id=vault_env \
+      if [ -f /run/secrets/vault_env ]; then set -a; . /run/secrets/vault_env; set +a; fi && \
+      <build command>
+  Without this line in the Dockerfile, env vars will NOT be available at build time no matter how many times you rebuild.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 				mcp.WithString("vars", mcp.Required(), mcp.Description(`JSON object of key-value pairs. Example: {"DB_HOST":"localhost","DB_PORT":"5432"}`)),
