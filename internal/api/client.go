@@ -193,8 +193,9 @@ func (c *Client) AuthGitHub(ctx context.Context, code string) (*AuthResponse, er
 }
 
 type MeResponse struct {
-	GithubID int64  `json:"github_id"`
-	Username string `json:"username"`
+	GithubID  int64  `json:"github_id"`
+	Username  string `json:"username"`
+	ExpiresAt string `json:"expires_at,omitempty"`
 }
 
 func (c *Client) GetMe(ctx context.Context) (*MeResponse, error) {

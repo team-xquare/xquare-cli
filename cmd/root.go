@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -229,16 +230,41 @@ func newWhoamiCmd() *cobra.Command {
 			if pc, _ := config.LoadProject(); pc != nil {
 				project = pc.Project
 			}
+			// Fetch server-verified identity and token expiry from /auth/me
+			expiresAt := ""
+			username := cfg.Username
+			if cfg.ServerURL != "" {
+				c := api.New(cfg.ServerURL, cfg.Token)
+				if me, err := c.GetMe(cmd.Context()); err == nil {
+					if me.Username != "" {
+						username = me.Username
+					}
+					expiresAt = me.ExpiresAt
+				}
+			}
 			if isJSON, _ := cmd.Root().PersistentFlags().GetBool("json"); isJSON {
-				m := map[string]string{"username": cfg.Username}
+				m := map[string]any{"username": username}
 				if project != "" {
 					m["project"] = project
 				}
+				if expiresAt != "" {
+					m["expires_at"] = expiresAt
+				}
 				return output.JSON(m)
 			}
-			fmt.Println(cfg.Username)
+			fmt.Println(username)
 			if project != "" {
 				output.Info(fmt.Sprintf("project: %s", project))
+			}
+			if expiresAt != "" {
+				if t, err := time.Parse("2006-01-02T15:04:05Z", expiresAt); err == nil {
+					remaining := time.Until(t).Round(time.Minute)
+					if remaining > 0 {
+						output.Info(fmt.Sprintf("token expires in %s", remaining))
+					} else {
+						output.Warn("token expired — run: xquare login")
+					}
+				}
 			}
 			return nil
 		},

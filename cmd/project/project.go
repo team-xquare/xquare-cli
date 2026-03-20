@@ -226,7 +226,8 @@ func newDeleteCmd() *cobra.Command {
 						addonCount = len(addons)
 					}
 					if appCount > 0 || addonCount > 0 {
-						output.Info(fmt.Sprintf("project %q contains %d app(s) and %d addon(s) — all will be deleted", projectName, appCount, addonCount))
+						output.Warn(fmt.Sprintf("project %q contains %d app(s) and %d addon(s)", projectName, appCount, addonCount))
+						output.Warn("this will permanently delete: all apps, addons, environment variables (Vault secrets), and the K8s namespace")
 					}
 				}
 				return fmt.Errorf("use --yes to confirm deletion of project %q", projectName)

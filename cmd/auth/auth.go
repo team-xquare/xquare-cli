@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -86,6 +87,7 @@ func newAuthStatusCmd() *cobra.Command {
 			// Verify the token is still valid by calling /auth/me
 			tokenValid := true
 			tokenExpired := false
+			expiresAt := ""
 			if serverURL != "" {
 				c := api.New(serverURL, token)
 				if me, err := c.GetMe(cmd.Context()); err != nil {
@@ -96,9 +98,12 @@ func newAuthStatusCmd() *cobra.Command {
 						// Network error or server unavailable — don't mark as invalid
 						tokenValid = true
 					}
-				} else if me.Username != "" {
-					// Server confirmed identity; use server's username as authoritative
-					username = me.Username
+				} else {
+					if me.Username != "" {
+						// Server confirmed identity; use server's username as authoritative
+						username = me.Username
+					}
+					expiresAt = me.ExpiresAt
 				}
 			}
 			if isJSON, _ := cmd.Root().PersistentFlags().GetBool("json"); isJSON {
@@ -111,6 +116,9 @@ func newAuthStatusCmd() *cobra.Command {
 				if tokenExpired {
 					m["expired"] = true
 				}
+				if expiresAt != "" {
+					m["expires_at"] = expiresAt
+				}
 				return output.JSON(m)
 			}
 			if !tokenValid {
@@ -119,6 +127,16 @@ func newAuthStatusCmd() *cobra.Command {
 			}
 			fmt.Printf("logged in as %s (via %s)\n", username, via)
 			fmt.Printf("server: %s\n", serverURL)
+			if expiresAt != "" {
+				if t, err := time.Parse("2006-01-02T15:04:05Z", expiresAt); err == nil {
+					remaining := time.Until(t).Round(time.Minute)
+					if remaining > 0 {
+						fmt.Printf("token expires: %s (in %s)\n", t.Local().Format("2006-01-02 15:04"), remaining)
+					} else {
+						fmt.Printf("token expires: %s (expired)\n", t.Local().Format("2006-01-02 15:04"))
+					}
+				}
+			}
 			return nil
 		},
 	}
