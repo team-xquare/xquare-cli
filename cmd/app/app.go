@@ -513,16 +513,39 @@ func newUpdateCmd() *cobra.Command {
 				}
 				body["github"] = gh
 			}
-			if cmd.Flags().Changed("build-type") {
-				buildType, _ := cmd.Flags().GetString("build-type")
-				validBuildTypes := map[string]bool{
-					"gradle": true, "nodejs": true, "react": true, "vite": true,
-					"vue": true, "nextjs": true, "nextjs-export": true,
-					"go": true, "rust": true, "maven": true, "django": true,
-					"flask": true, "docker": true,
+			// Determine if any build-specific flag was changed.
+			// If --build-type was specified, rebuild the full build spec.
+			// If only build-tuning flags changed (--build-command, --start-command, etc.),
+			// apply them as patch overrides on top of the existing build config.
+			buildSpecFlags := []string{"build-type", "build-command", "start-command", "dist-path",
+				"jar-output", "binary-name", "dockerfile", "context",
+				"java-version", "node-version", "go-version", "rust-version", "python-version"}
+			anyBuildChanged := false
+			for _, f := range buildSpecFlags {
+				if cmd.Flags().Changed(f) {
+					anyBuildChanged = true
+					break
 				}
-				if !validBuildTypes[buildType] {
-					return fmt.Errorf("invalid --build-type %q\n\nSupported types: gradle, nodejs, react, vite, vue, nextjs, nextjs-export, go, rust, maven, django, flask, docker", buildType)
+			}
+			if anyBuildChanged {
+				buildType := ""
+				if cmd.Flags().Changed("build-type") {
+					buildType, _ = cmd.Flags().GetString("build-type")
+					validBuildTypes := map[string]bool{
+						"gradle": true, "nodejs": true, "react": true, "vite": true,
+						"vue": true, "nextjs": true, "nextjs-export": true,
+						"go": true, "rust": true, "maven": true, "django": true,
+						"flask": true, "docker": true,
+					}
+					if !validBuildTypes[buildType] {
+						return fmt.Errorf("invalid --build-type %q\n\nSupported types: gradle, nodejs, react, vite, vue, nextjs, nextjs-export, go, rust, maven, django, flask, docker", buildType)
+					}
+				} else {
+					// Infer build type from existing config
+					buildType = fmt.Sprintf("%v", existing["buildType"])
+					if buildType == "" || buildType == "<nil>" {
+						return fmt.Errorf("cannot update build flags: app has no build type set\n\n  use --build-type to specify the build type")
+					}
 				}
 				body["build"] = buildBody(buildType, cmd)
 			}
