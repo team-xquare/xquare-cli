@@ -218,9 +218,22 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 		if !follow {
 			return scanner.Err()
 		}
-		// If scanner ended cleanly and we're following, check if build completed
+		// Scanner ended (cleanly or with error) while following.
+		// Check if the build has completed — if so, we're done; otherwise reconnect.
 		if scanner.Err() == nil {
-			return nil
+			builds, err := c.ListBuilds(cmd.Context(), project, appName)
+			if err == nil {
+				for _, b := range builds {
+					if fmt.Sprintf("%v", b["id"]) == buildID {
+						s := fmt.Sprintf("%v", b["status"])
+						if s != "running" && s != "pending" {
+							return nil // build finished, stop following
+						}
+						break
+					}
+				}
+			}
+			// Build still running or status unknown — reconnect
 		}
 	}
 	return nil

@@ -31,16 +31,35 @@ func NewEnvCmd() *cobra.Command {
 
 // sensitiveKeyPatterns lists substrings that indicate a sensitive env key.
 // Values with these keys are masked by default (shown as ***) unless --reveal is set.
+// Patterns are matched as word components (separated by _ or at string boundaries)
+// to avoid false positives like AUTHOR matching AUTH or MONKEY matching KEY.
 var sensitiveKeyPatterns = []string{
-	"PASSWORD", "PASSWD", "SECRET", "TOKEN", "KEY", "CREDENTIAL",
-	"PRIVATE", "API_KEY", "AUTH", "DSN", "DATABASE_URL", "JDBC",
+	"PASSWORD", "PASSWD", "SECRET", "TOKEN", "CREDENTIAL",
+	"PRIVATE_KEY", "PRIVATE", "API_KEY", "AUTH_TOKEN", "AUTH_SECRET",
+	"ACCESS_KEY", "ACCESS_TOKEN", "DSN", "DATABASE_URL", "JDBC",
+	"CLIENT_SECRET", "APP_SECRET",
 }
 
 // isSensitiveKey returns true if the key looks like it contains credentials.
+// Uses whole-word matching on underscore-separated components to avoid false
+// positives (e.g. KEY matching MONKEY, AUTH matching AUTHOR).
 func isSensitiveKey(key string) bool {
 	upper := strings.ToUpper(key)
+	// First check exact multi-word patterns (e.g. API_KEY, DATABASE_URL)
 	for _, pat := range sensitiveKeyPatterns {
 		if strings.Contains(upper, pat) {
+			return true
+		}
+	}
+	// Then check single-word components for common credential words
+	parts := strings.Split(upper, "_")
+	singleWordSensitive := map[string]bool{
+		"PASSWORD": true, "PASSWD": true, "SECRET": true, "TOKEN": true,
+		"CREDENTIAL": true, "CREDENTIALS": true, "CERT": true, "CERTIFICATE": true,
+		"KEY": true, "PEM": true, "DSN": true, "PWD": true,
+	}
+	for _, part := range parts {
+		if singleWordSensitive[part] {
 			return true
 		}
 	}
