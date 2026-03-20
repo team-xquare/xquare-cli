@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -88,7 +89,8 @@ func newListCmd() *cobra.Command {
 				output.Table([]string{"NAME", "BUILD TYPE", "GITHUB"}, rows)
 				return nil
 			}
-			// Parallel status fetch
+			// Parallel status fetch — each goroutine gets its own 10s timeout so a
+			// single hanging K8s call cannot block the entire table indefinitely.
 			type result struct {
 				name   string
 				status map[string]any
@@ -102,7 +104,9 @@ func newListCmd() *cobra.Command {
 					defer wg.Done()
 					name := fmt.Sprintf("%v", app["name"])
 					results[idx].name = name
-					st, err := c.GetAppStatus(cmd.Context(), project, name)
+					ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
+					defer cancel()
+					st, err := c.GetAppStatus(ctx, project, name)
 					results[idx].status = st
 					results[idx].err = err
 				}(i, a)

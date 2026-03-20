@@ -306,12 +306,13 @@ func newAddonGetCmd() *cobra.Command {
 				}
 				if api.IsJSON(cmd) {
 					return output.JSON(map[string]any{
-						"status":    readyStr,
-						"type":      addonType,
-						"host":      addonName,
-						"port":      conn["port"],
-						"dashboard": dashURL,
-						"buckets":   buckets,
+						"status":      readyStr,
+						"type":        addonType,
+						"host":        addonName,
+						"port":        conn["port"],
+						"tunnelReady": conn["tunnelReady"],
+						"dashboard":   dashURL,
+						"buckets":     buckets,
 					})
 				}
 				rows := [][]string{
@@ -334,11 +335,13 @@ func newAddonGetCmd() *cobra.Command {
 
 			if api.IsJSON(cmd) {
 				return output.JSON(map[string]any{
-					"status":    readyStr,
-					"type":      addonType,
-					"host":      addonName,
-					"port":      conn["port"],
-					"dashboard": dashURL,
+					"status":      readyStr,
+					"type":        addonType,
+					"host":        addonName,
+					"port":        conn["port"],
+					"password":    conn["password"],
+					"tunnelReady": conn["tunnelReady"],
+					"dashboard":   dashURL,
 				})
 			}
 			rows := [][]string{
