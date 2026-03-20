@@ -929,6 +929,7 @@ BEFORE calling this tool you MUST:
 				mcp.WithDescription("List recent CI/CD build history for an app. Returns build ID, status (running/success/failed), and timestamps."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
+				mcp.WithNumber("limit", mcp.Description("Maximum number of builds to return (default: 10, max: 50)")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				project, err := req.RequireString("project")
 				if err != nil {
@@ -938,7 +939,11 @@ BEFORE calling this tool you MUST:
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
-				data, err := client.ListBuilds(ctx, project, app)
+				limit := int(req.GetFloat("limit", 10))
+				if limit <= 0 || limit > 50 {
+					limit = 10
+				}
+				data, err := client.ListBuildsLimit(ctx, project, app, limit)
 				return jsonResult(data, err)
 			})
 

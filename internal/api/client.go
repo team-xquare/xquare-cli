@@ -372,6 +372,14 @@ func (c *Client) ListBuilds(ctx context.Context, project, app string) ([]map[str
 	return out.Builds, c.get(ctx, "/projects/"+project+"/apps/"+app+"/builds", &out)
 }
 
+func (c *Client) ListBuildsLimit(ctx context.Context, project, app string, limit int) ([]map[string]any, error) {
+	var out struct {
+		Builds []map[string]any `json:"builds"`
+	}
+	path := fmt.Sprintf("/projects/%s/apps/%s/builds?limit=%d", project, app, limit)
+	return out.Builds, c.get(ctx, path, &out)
+}
+
 // Allowlist API
 
 func (c *Client) ListAllowlist(ctx context.Context) ([]map[string]any, error) {

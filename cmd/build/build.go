@@ -33,13 +33,14 @@ func newBuildListCmd() *cobra.Command {
 				return err
 			}
 			appName := args[0]
-			builds, err := c.ListBuilds(cmd.Context(), project, appName)
+			// Request the limit from the server to avoid fetching more than needed.
+			fetchLimit := limit
+			if fetchLimit <= 0 {
+				fetchLimit = 50 // 0 = all, let server return max
+			}
+			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, fetchLimit)
 			if err != nil {
 				return err
-			}
-			// Apply client-side limit (server returns up to 50)
-			if limit > 0 && len(builds) > limit {
-				builds = builds[:limit]
 			}
 			if api.IsJSON(cmd) {
 				return output.JSON(builds)

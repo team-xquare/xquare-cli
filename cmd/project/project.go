@@ -135,7 +135,20 @@ func newGetCmd() *cobra.Command {
 				rows = append(rows, []string{"Apps", fmt.Sprintf("%d", len(apps))})
 				for _, a := range apps {
 					if app, ok := a.(map[string]any); ok {
-						rows = append(rows, []string{"  app", fmt.Sprintf("%v", app["name"])})
+						name := fmt.Sprintf("%v", app["name"])
+						buildType := fmt.Sprintf("%v", app["buildType"])
+						if buildType == "<nil>" || buildType == "" {
+							buildType = "-"
+						}
+						github := ""
+						if gh, ok := app["github"].(map[string]any); ok {
+							github = fmt.Sprintf("%v/%v@%v", gh["owner"], gh["repo"], gh["branch"])
+						}
+						detail := buildType
+						if github != "" {
+							detail = buildType + "  " + github
+						}
+						rows = append(rows, []string{"  " + name, detail})
 					}
 				}
 			}
@@ -143,14 +156,15 @@ func newGetCmd() *cobra.Command {
 				rows = append(rows, []string{"Addons", fmt.Sprintf("%d", len(addons))})
 				for _, a := range addons {
 					if addon, ok := a.(map[string]any); ok {
-						rows = append(rows, []string{"  addon", fmt.Sprintf("%v (%v)", addon["name"], addon["type"])})
+						rows = append(rows, []string{"  " + fmt.Sprintf("%v", addon["name"]), fmt.Sprintf("%v", addon["type"])})
 					}
 				}
 			}
-			if owners, ok := p["owners"].([]any); ok {
+			if owners, ok := p["owners"].([]any); ok && len(owners) > 0 {
+				rows = append(rows, []string{"Members", fmt.Sprintf("%d", len(owners))})
 				for _, o := range owners {
 					if owner, ok := o.(map[string]any); ok {
-						rows = append(rows, []string{"Member", fmt.Sprintf("%v", owner["username"])})
+						rows = append(rows, []string{"  " + fmt.Sprintf("%v", owner["username"]), ""})
 					}
 				}
 			}
