@@ -208,12 +208,21 @@ func newEnvDeleteCmd() *cobra.Command {
 				return nil
 			}
 			c := api.FromCmd(cmd)
+			var errs []string
+			deleted := 0
 			for _, k := range keys {
 				if err := c.DeleteEnvKey(cmd.Context(), project, appName, k); err != nil {
-					return err
+					errs = append(errs, fmt.Sprintf("%s: %s", k, err.Error()))
+				} else {
+					deleted++
 				}
 			}
-			output.Success(fmt.Sprintf("deleted %d env var(s)", len(keys)))
+			if deleted > 0 {
+				output.Success(fmt.Sprintf("deleted %d env var(s)", deleted))
+			}
+			if len(errs) > 0 {
+				return fmt.Errorf("failed to delete %d env var(s):\n  %s", len(errs), strings.Join(errs, "\n  "))
+			}
 			return nil
 		},
 	}

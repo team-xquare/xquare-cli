@@ -71,7 +71,7 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 		case "not_deployed":
 			return fmt.Errorf("%s\n\n  xquare trigger %s --watch   # start deployment", e.Error, appName)
 		case "start_timeout":
-			return fmt.Errorf("%s\n\n  xquare app status %s   # check status\n  xquare builds %s        # check build logs", e.Error, appName, appName)
+			return fmt.Errorf("%s\n\n  xquare app status %s          # check status\n  xquare logs %s --build         # check build logs", e.Error, appName, appName)
 		default:
 			if e.Error != "" {
 				return fmt.Errorf("%s", e.Error)
