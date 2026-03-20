@@ -248,12 +248,12 @@ func newStatusCmd() *cobra.Command {
 			}
 
 			// Human-readable status annotation
-			statusDisplay := appStatus
+			statusDisplay := formatAppStatus(appStatus)
 			switch deployPhase {
 			case "building":
-				statusDisplay = appStatus + "  (building...)"
+				statusDisplay = formatAppStatus(appStatus) + "  (building...)"
 			case "syncing":
-				statusDisplay = appStatus + "  (syncing...)"
+				statusDisplay = formatAppStatus(appStatus) + "  (syncing...)"
 			}
 
 			// Instances display

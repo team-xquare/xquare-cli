@@ -105,6 +105,22 @@ func buildSchema() map[string]any {
 			envSchema(),
 			addonSchema(),
 			{
+				Command:     "build",
+				Description: "Manage CI/CD builds. Use 'build list' to see recent build history.",
+				SubCommands: []CommandSchema{
+					{
+						Command:     "build list <app>",
+						Description: "List recent CI/CD builds for an app, showing build ID, status, and start time.",
+						Args:        []ArgSchema{{Name: "app", Required: true, Desc: "app name"}},
+						Examples: []string{
+							"xquare build list my-api",
+							"xquare build list my-api --json",
+							"xquare build list my-api --project myproject",
+						},
+					},
+				},
+			},
+			{
 				Command:     "trigger <app>",
 				Description: "Force re-run CI/CD for the latest commit. NOTE: CI/CD normally runs automatically on git push — only use this when the automatic webhook failed or you need to re-deploy without a code change. Use --watch to wait until deployment completes.",
 				Args:        []ArgSchema{{Name: "app", Required: true}},
