@@ -379,6 +379,9 @@ func newAddonConnectCmd() *cobra.Command {
 			if addonType == "seaweedfs" {
 				return fmt.Errorf("seaweedfs is an S3-compatible object storage — use an S3 client (AWS SDK, s3cmd, etc.) instead\n\n  xquare addon status %s   # get bucket credentials", addonName)
 			}
+			if fmt.Sprintf("%v", conn["tunnelReady"]) != "true" {
+				return fmt.Errorf("tunnel access server not ready for project %q\n\n  xquare addon list   # check provisioning status", project)
+			}
 			tunnelHost := fmt.Sprintf("%v", conn["host"])
 			portF, portOK := conn["port"].(float64)
 			if !portOK {
@@ -441,6 +444,9 @@ func newAddonTunnelCmd() *cobra.Command {
 				return fmt.Errorf("get connection info: %w", err)
 			}
 
+			if fmt.Sprintf("%v", conn["tunnelReady"]) != "true" {
+				return fmt.Errorf("tunnel access server not ready for project %q\n\n  xquare addon list   # check provisioning status", project)
+			}
 			tunnelHost := fmt.Sprintf("%v", conn["host"])
 			portF, portOK := conn["port"].(float64)
 			if !portOK {
