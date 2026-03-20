@@ -412,14 +412,15 @@ func newCreateCmd() *cobra.Command {
 				return output.JSON(result)
 			}
 			output.Success(fmt.Sprintf("created app %s in project %s", appName, project))
+			output.Info(fmt.Sprintf("  build: %s  repo: %s/%s@%s", buildType, owner, repo, branch))
 			for _, ep := range endpoints {
 				port := fmt.Sprintf("%v", ep["port"])
 				if routes, ok := ep["routes"].([]string); ok && len(routes) > 0 {
 					for _, r := range routes {
-						output.Info(fmt.Sprintf("  :%s → https://%s", port, r))
+						output.Info(fmt.Sprintf("  endpoint: :%s → https://%s", port, r))
 					}
 				} else {
-					output.Info(fmt.Sprintf("  :%s (internal)", port))
+					output.Info(fmt.Sprintf("  endpoint: :%s (internal)", port))
 				}
 			}
 

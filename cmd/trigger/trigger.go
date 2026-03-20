@@ -127,11 +127,17 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 				}
 				curVersion := fmt.Sprintf("%v", status["version"])
 				curStatus := fmt.Sprintf("%v", status["status"])
-				// Transition when: app just became deployed (was not_deployed before) OR
-				// version hash changed (re-deploy: new image rolled out by ArgoCD).
+				deployPhase := fmt.Sprintf("%v", status["deployPhase"])
+				// Transition when:
+				// 1. Version hash changed (ArgoCD rolled out a new image).
+				// 2. App was not-deployed before and now has a status (first deploy).
+				// 3. deployPhase is a runtime state — covers same-commit force-triggers
+				//    where the hash doesn't change but ArgoCD still synced and pods started.
 				versionChanged := curVersion != "" && curVersion != "<nil>" && curVersion != preVersion
 				wasNotDeployed := preVersion == "" || preVersion == "<nil>"
-				if versionChanged || (wasNotDeployed && curStatus != "not_deployed") {
+				deployPhaseKnown := deployPhase == "running" || deployPhase == "failed" ||
+					deployPhase == "pending" || deployPhase == "stopped"
+				if versionChanged || (wasNotDeployed && curStatus != "not_deployed") || deployPhaseKnown {
 					phase = "deploying"
 				}
 

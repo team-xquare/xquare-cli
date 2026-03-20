@@ -796,7 +796,12 @@ For local tunneling use 'xquare addon tunnel' CLI command.`),
 - Just because you want to "start a build" after pushing
 - Repeatedly to check if build works (push once, wait, check logs)
 
-CI pipeline must be ready (ciReady=true in get_app_status) before calling trigger.`),
+CI pipeline must be ready (ciReady=true in get_app_status) before calling trigger.
+
+AFTER calling trigger:
+- The response includes the build ID (e.g. "myapp-ci-abc123")
+- Call get_build_logs with that build_id to watch build progress (wait 20-30s first for pod to initialize)
+- Call get_app_status periodically to check deployPhase: building → syncing → running`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -809,7 +814,15 @@ CI pipeline must be ready (ciReady=true in get_app_status) before calling trigge
 					return mcp.NewToolResultError(err.Error()), nil
 				}
 				data, err := client.TriggerApp(ctx, project, app)
-				return jsonResult(data, err)
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				buildID := ""
+				if data != nil {
+					buildID = fmt.Sprintf("%v", data["build"])
+				}
+				msg := fmt.Sprintf("build started: %s/%s  [%s]\n\nNext steps:\n  1. Wait ~30s for the build pod to initialize\n  2. Call get_build_logs with build_id=%q to watch build output\n  3. Call get_app_status periodically — deployPhase progresses: building → syncing → running", project, app, buildID, buildID)
+				return mcp.NewToolResultText(msg), nil
 			})
 
 			s.AddTool(mcp.NewTool("get_logs",
