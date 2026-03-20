@@ -73,11 +73,11 @@ func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName strin
 		case "start_timeout":
 			return fmt.Errorf("%s\n\n  xquare app status %s          # check status\n  xquare logs %s --build         # check build logs", e.Error, appName, appName)
 		default:
+			if resp.StatusCode == 404 {
+				return fmt.Errorf("app %q not found in project %q\n\n  xquare app list --project %s   # list apps in this project", appName, project, project)
+			}
 			if e.Error != "" {
 				return fmt.Errorf("%s", e.Error)
-			}
-			if resp.StatusCode == 404 {
-				return fmt.Errorf("app %q not found in project %q\n\n  xquare app list   # list apps in this project", appName, project)
 			}
 			return fmt.Errorf("failed to fetch logs (status %d) — please retry", resp.StatusCode)
 		}

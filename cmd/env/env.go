@@ -81,6 +81,9 @@ func newEnvGetCmd() *cobra.Command {
 			}
 			envs, err := c.GetEnv(cmd.Context(), project, args[0])
 			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					return fmt.Errorf("app %q not found in project %q\n\n  xquare app list --project %s   # list available apps", args[0], project, project)
+				}
 				return err
 			}
 			if api.IsJSON(cmd) {

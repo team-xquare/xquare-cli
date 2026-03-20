@@ -2,6 +2,7 @@ package trigger
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -40,6 +41,9 @@ Use trigger only when:
 			c := api.FromCmd(cmd)
 			result, err := c.TriggerApp(cmd.Context(), project, appName)
 			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					return fmt.Errorf("app %q not found in project %q\n\n  xquare app list --project %s   # list available apps\n  xquare app create %s           # create this app", appName, project, project, appName)
+				}
 				return err
 			}
 
