@@ -28,7 +28,10 @@ func parseStorageBytes(s string) (int64, error) {
 	if m == nil {
 		return 0, fmt.Errorf("invalid storage %q: must be a number followed by a unit (e.g. 1Gi, 500Mi)", s)
 	}
-	n, _ := strconv.ParseInt(m[1], 10, 64)
+	n, err := strconv.ParseInt(m[1], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid storage value %q: %w", m[1], err)
+	}
 	units := map[string]int64{
 		"Ki": 1024, "Mi": 1024 * 1024, "Gi": 1024 * 1024 * 1024,
 		"Ti": 1024 * 1024 * 1024 * 1024, "Pi": 1024 * 1024 * 1024 * 1024 * 1024,
@@ -36,7 +39,12 @@ func parseStorageBytes(s string) (int64, error) {
 		"T": 1000 * 1000 * 1000 * 1000, "P": 1000 * 1000 * 1000 * 1000 * 1000,
 		"E": 1000 * 1000 * 1000 * 1000 * 1000 * 1000,
 	}
-	return n * units[m[2]], nil
+	// Guard against integer overflow: if n > MaxInt64/unit the multiplication wraps.
+	unit := units[m[2]]
+	if n > 0 && unit > 0 && n > (1<<63-1)/unit {
+		return 0, fmt.Errorf("storage value %q overflows int64", s)
+	}
+	return n * unit, nil
 }
 
 func NewAddonCmd() *cobra.Command {

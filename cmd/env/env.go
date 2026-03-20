@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -266,9 +267,17 @@ func newEnvPushCmd() *cobra.Command {
 					continue
 				}
 				v := strings.TrimSpace(parts[1])
-				// unquote if quoted
+				// Unquote double-quoted values using strconv.Unquote so that escape
+				// sequences like \n, \t, \" are handled correctly. Fall back to the
+				// raw (trimmed) value if not a valid Go quoted literal.
 				if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
-					v = strings.Trim(v, "\"")
+					if unquoted, err := strconv.Unquote(v); err == nil {
+						v = unquoted
+					} else {
+						// Unquote failed (e.g. unescaped quote inside): strip surrounding
+						// quotes as best-effort fallback.
+						v = v[1 : len(v)-1]
+					}
 				}
 				envs[k] = v
 			}

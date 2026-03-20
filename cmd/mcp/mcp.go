@@ -295,19 +295,7 @@ Minimal implementation in the user's Dockerfile:
 					body["endpoints"] = endpoints
 				}
 
-				// Trigger paths
-				if owner := req.GetString("github_owner", ""); owner != "" {
-					if gh, ok := body["github"].(map[string]any); ok {
-						gh["owner"] = owner
-					}
-				}
-
-				if repo := req.GetString("github_repo", ""); repo != "" {
-					if gh, ok := body["github"].(map[string]any); ok {
-						gh["repo"] = repo
-					}
-				}
-
+				// Trigger paths (optional CI path filter)
 				if tp := req.GetString("trigger_paths", ""); tp != "" {
 					paths := strings.Split(tp, ",")
 					if gh, ok := body["github"].(map[string]any); ok {
