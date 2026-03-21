@@ -87,9 +87,9 @@ Use a registration flag to add xquare as an MCP server in your AI tool:
 			// ── Project tools ──────────────────────────────────────────────
 
 			s.AddTool(mcp.NewTool("list_projects",
-				mcp.WithDescription("List all projects you have access to. Returns array of project name strings."),
+				mcp.WithDescription("List all projects you have access to. Returns array of {name, appCount, addonCount} objects. Use get_project for full details of a specific project."),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				data, err := client.ListProjects(ctx)
+				data, err := client.ListProjectsWithCounts(ctx)
 				return jsonResult(data, err)
 			})
 
@@ -882,6 +882,7 @@ AFTER calling trigger:
 				}
 				var lines []string
 				scanner := bufio.NewScanner(resp.Body)
+				scanner.Buffer(make([]byte, 512*1024), 512*1024)
 				for scanner.Scan() {
 					lines = append(lines, scanner.Text())
 				}
@@ -1017,6 +1018,7 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 				}
 				var lines []string
 				scanner := bufio.NewScanner(resp.Body)
+				scanner.Buffer(make([]byte, 512*1024), 512*1024)
 				for scanner.Scan() {
 					lines = append(lines, scanner.Text())
 				}
