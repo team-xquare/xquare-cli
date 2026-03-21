@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -611,6 +612,11 @@ func newUpdateCmd() *cobra.Command {
 				output.Info(fmt.Sprintf("[dry-run] would update app %s in project %s", appName, project))
 				return output.JSON(body)
 			}
+			// Show a human-readable diff of changed fields before applying (TTY only).
+			// This helps users catch typos or wrong-app errors before the write goes through.
+			if !api.IsJSON(cmd) && output.IsTTY() {
+				printAppUpdateDiff(existing, body)
+			}
 			result, err := c.UpdateApp(cmd.Context(), project, appName, body)
 			if err != nil {
 				return err
@@ -642,6 +648,83 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().String("context", ".", "Docker build context")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen")
 	return cmd
+}
+
+// printAppUpdateDiff compares the before/after app config maps and prints
+// a concise summary of changed fields to stderr. Only top-level scalar fields
+// and nested github/build keys are diffed — sufficient to catch most user errors.
+func printAppUpdateDiff(before, after map[string]any) {
+	type change struct {
+		key  string
+		from string
+		to   string
+	}
+	var changes []change
+
+	stringify := func(v any) string {
+		if v == nil {
+			return ""
+		}
+		b, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return string(b)
+	}
+
+	// Compare github sub-fields individually for readability
+	beforeGH, _ := before["github"].(map[string]any)
+	afterGH, _ := after["github"].(map[string]any)
+	for _, k := range []string{"owner", "repo", "branch", "triggerPaths"} {
+		bv := stringify(beforeGH[k])
+		av := stringify(afterGH[k])
+		if bv != av {
+			changes = append(changes, change{"github." + k, bv, av})
+		}
+	}
+
+	// Compare build type
+	bBuildType := fmt.Sprintf("%v", before["buildType"])
+	aBuildType := fmt.Sprintf("%v", after["buildType"])
+	if bBuildType == "<nil>" {
+		bBuildType = ""
+	}
+	if aBuildType == "<nil>" {
+		aBuildType = ""
+	}
+	if bBuildType != aBuildType {
+		changes = append(changes, change{"buildType", bBuildType, aBuildType})
+	}
+
+	// Compare full build spec
+	bBuild := stringify(before["build"])
+	aBuild := stringify(after["build"])
+	if bBuild != aBuild && bBuildType == aBuildType {
+		// Same build type, but options changed — show the diff
+		changes = append(changes, change{"build", bBuild, aBuild})
+	}
+
+	// Compare endpoints
+	bEP := stringify(before["endpoints"])
+	aEP := stringify(after["endpoints"])
+	if bEP != aEP {
+		changes = append(changes, change{"endpoints", bEP, aEP})
+	}
+
+	if len(changes) == 0 {
+		output.Info("(no changes detected)")
+		return
+	}
+	output.Info("changes to apply:")
+	for _, ch := range changes {
+		if ch.from == "" {
+			output.Info(fmt.Sprintf("  + %s: %s", ch.key, ch.to))
+		} else if ch.to == "" {
+			output.Info(fmt.Sprintf("  - %s: %s", ch.key, ch.from))
+		} else {
+			output.Info(fmt.Sprintf("  ~ %s: %s → %s", ch.key, ch.from, ch.to))
+		}
+	}
 }
 
 func newDeleteCmd() *cobra.Command {
