@@ -135,6 +135,9 @@ func newListCmd() *cobra.Command {
 						if msg, ok := r.status["message"]; ok {
 							entry["message"] = msg
 						}
+						if lb, ok := r.status["lastBuild"]; ok {
+							entry["lastBuild"] = lb
+						}
 					}
 					enriched = append(enriched, entry)
 				}

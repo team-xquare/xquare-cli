@@ -141,7 +141,7 @@ func streamRuntimeOnce(cmd *cobra.Command, c *api.Client, project, appName strin
 
 func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildID string, follow bool, tail int64) error {
 	if buildID == "latest" {
-		builds, err := c.ListBuilds(cmd.Context(), project, appName)
+		builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, 1)
 		if err != nil {
 			return fmt.Errorf("list builds: %w", err)
 		}
@@ -175,7 +175,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 		if attempt > 0 {
 			// Check if build is still running before reconnecting
 			finalFetch := false
-			builds, err := c.ListBuilds(cmd.Context(), project, appName)
+			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, 10)
 			if err == nil {
 				for _, b := range builds {
 					if fmt.Sprintf("%v", b["id"]) == buildID {
@@ -270,7 +270,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 		// Scanner ended (cleanly or with error) while following.
 		// Check if the build has completed — if so, we're done; otherwise reconnect.
 		if scanner.Err() == nil {
-			builds, err := c.ListBuilds(cmd.Context(), project, appName)
+			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, 10)
 			if err == nil {
 				for _, b := range builds {
 					if fmt.Sprintf("%v", b["id"]) == buildID {

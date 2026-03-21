@@ -995,7 +995,7 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 				}
 				buildID := req.GetString("build_id", "")
 				if buildID == "" {
-					builds, err := client.ListBuilds(ctx, project, appName)
+					builds, err := client.ListBuildsLimit(ctx, project, appName, 1)
 					if err != nil {
 						return mcp.NewToolResultError(err.Error()), nil
 					}
