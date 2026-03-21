@@ -43,7 +43,26 @@ func newBuildListCmd() *cobra.Command {
 				return err
 			}
 			if api.IsJSON(cmd) {
-				return output.JSON(builds)
+				// Enrich each build with a computed "duration" field so callers
+				// don't have to subtract startedAt from finishedAt themselves.
+				enriched := make([]map[string]any, 0, len(builds))
+				for _, b := range builds {
+					entry := make(map[string]any, len(b)+1)
+					for k, v := range b {
+						entry[k] = v
+					}
+					startStr := fmt.Sprintf("%v", b["startedAt"])
+					finStr := fmt.Sprintf("%v", b["finishedAt"])
+					if startStr != "" && startStr != "<nil>" && finStr != "" && finStr != "<nil>" {
+						if st, err1 := time.Parse(time.RFC3339, startStr); err1 == nil {
+							if ft, err2 := time.Parse(time.RFC3339, finStr); err2 == nil {
+								entry["duration"] = ft.Sub(st).Round(time.Second).String()
+							}
+						}
+					}
+					enriched = append(enriched, entry)
+				}
+				return output.JSON(enriched)
 			}
 			if len(builds) == 0 {
 				output.Info(fmt.Sprintf("no builds found for %s/%s", project, appName))
@@ -55,16 +74,29 @@ func newBuildListCmd() *cobra.Command {
 				id := fmt.Sprintf("%v", b["id"])
 				status := fmt.Sprintf("%v", b["status"])
 				startedAt := ""
+				var startTime time.Time
 				if s := fmt.Sprintf("%v", b["startedAt"]); s != "" && s != "<nil>" {
 					if t, err := time.Parse(time.RFC3339, s); err == nil {
+						startTime = t
 						startedAt = t.Local().Format("2006-01-02 15:04:05") + fmt.Sprintf("  (%s ago)", time.Since(t).Round(time.Second))
 					} else {
 						startedAt = s
 					}
 				}
-				rows = append(rows, []string{id, status, startedAt})
+				duration := ""
+				if finStr := fmt.Sprintf("%v", b["finishedAt"]); finStr != "" && finStr != "<nil>" {
+					if ft, err := time.Parse(time.RFC3339, finStr); err == nil {
+						if !startTime.IsZero() {
+							duration = ft.Sub(startTime).Round(time.Second).String()
+						}
+					}
+				} else if !startTime.IsZero() && (status == "running" || status == "pending") {
+					// For in-progress builds, show elapsed time
+					duration = time.Since(startTime).Round(time.Second).String() + " (running)"
+				}
+				rows = append(rows, []string{id, status, startedAt, duration})
 			}
-			output.Table([]string{"BUILD ID", "STATUS", "STARTED"}, rows)
+			output.Table([]string{"BUILD ID", "STATUS", "STARTED", "DURATION"}, rows)
 			output.Info(fmt.Sprintf("\n  xquare logs %s --build --follow   # stream latest build logs", appName))
 			return nil
 		},
