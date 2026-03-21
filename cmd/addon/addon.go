@@ -474,9 +474,6 @@ func newAddonTunnelCmd() *cobra.Command {
 				return fmt.Errorf("get connection info: %w", err)
 			}
 
-			if fmt.Sprintf("%v", conn["tunnelReady"]) != "true" {
-				return fmt.Errorf("tunnel access server not ready for project %q\n\n  xquare addon list   # check provisioning status", project)
-			}
 			tunnelHost := fmt.Sprintf("%v", conn["host"])
 			portF, portOK := conn["port"].(float64)
 			if !portOK {
@@ -493,8 +490,15 @@ func newAddonTunnelCmd() *cobra.Command {
 			connStr := connectionString(addonType, "127.0.0.1", strconv.Itoa(localPort), password, addonName)
 
 			if printURL {
+				if fmt.Sprintf("%v", conn["tunnelReady"]) != "true" {
+					output.Warn("tunnel access server not ready — connection URL may not work yet")
+				}
 				fmt.Println(connStr)
 				return nil
+			}
+
+			if fmt.Sprintf("%v", conn["tunnelReady"]) != "true" {
+				return fmt.Errorf("tunnel access server not ready for project %q\n\n  xquare addon list   # check provisioning status", project)
 			}
 
 			wstunnelBin, cleanupBin, err := resolveBinary()

@@ -324,6 +324,11 @@ func newStatusCmd() *cobra.Command {
 					}
 				}
 				rows = append(rows, []string{"Last Build", fmt.Sprintf("%s  [%s]%s", lbStatus, lbID, lbTime)})
+				if lbStatus == "failed" {
+					if lbMsg := fmt.Sprintf("%v", lb["message"]); lbMsg != "" && lbMsg != "<nil>" {
+						rows = append(rows, []string{"Build Error", lbMsg})
+					}
+				}
 			}
 
 			if msg := fmt.Sprintf("%v", status["message"]); msg != "" && msg != "<nil>" {

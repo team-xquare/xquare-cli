@@ -107,7 +107,7 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 			switch phase {
 
 			case "building":
-				builds, err := c.ListBuilds(cmd.Context(), project, app)
+				builds, err := c.ListBuildsLimit(cmd.Context(), project, app, 10)
 				if err != nil {
 					continue
 				}
