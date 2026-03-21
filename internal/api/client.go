@@ -212,6 +212,21 @@ func (c *Client) ListProjects(ctx context.Context) ([]string, error) {
 	return out.Projects, c.get(ctx, "/projects", &out)
 }
 
+type ProjectCount struct {
+	Name       string `json:"name"`
+	AppCount   int    `json:"appCount"`
+	AddonCount int    `json:"addonCount"`
+}
+
+// ListProjectsWithCounts fetches project names plus app/addon counts in a single
+// server request. The server resolves counts from YAML only — no K8s or GitHub calls.
+func (c *Client) ListProjectsWithCounts(ctx context.Context) ([]ProjectCount, error) {
+	var out struct {
+		Projects []ProjectCount `json:"projects"`
+	}
+	return out.Projects, c.get(ctx, "/projects?include=counts", &out)
+}
+
 func (c *Client) GetProject(ctx context.Context, project string) (map[string]any, error) {
 	var out map[string]any
 	return out, c.get(ctx, "/projects/"+project, &out)

@@ -174,28 +174,33 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 
 		if attempt > 0 {
 			// Check if build is still running before reconnecting
+			finalFetch := false
 			builds, err := c.ListBuilds(cmd.Context(), project, appName)
 			if err == nil {
 				for _, b := range builds {
 					if fmt.Sprintf("%v", b["id"]) == buildID {
 						s := fmt.Sprintf("%v", b["status"])
 						if s != "running" && s != "pending" {
-							// Build finished — do one final fetch to get remaining logs
 							if !printed {
-								// First time seeing logs after build finished
+								// Build already finished but we haven't fetched logs yet.
+								// Do one final fetch without delay or status message.
+								finalFetch = true
 								break
 							}
 							return nil
 						}
+						break
 					}
 				}
 			}
-			if printed {
-				output.Info("  connection lost, reconnecting...")
-			} else {
-				output.Info("  waiting for build logs...")
+			if !finalFetch {
+				if printed {
+					output.Info("  connection lost, reconnecting...")
+				} else {
+					output.Info("  waiting for build logs...")
+				}
+				time.Sleep(2 * time.Second)
 			}
-			time.Sleep(2 * time.Second)
 		}
 
 		resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, buildID, follow)

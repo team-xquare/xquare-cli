@@ -3,7 +3,6 @@ package project
 import (
 	"fmt"
 	"regexp"
-	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -44,7 +43,7 @@ func newListCmd() *cobra.Command {
 		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := api.FromCmd(cmd)
-			projects, err := c.ListProjects(cmd.Context())
+			projects, err := c.ListProjectsWithCounts(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -61,46 +60,19 @@ func newListCmd() *cobra.Command {
 				current = pc
 			}
 
-			// Fetch project details in parallel to show app/addon counts.
-			type projectDetail struct {
-				appCount   int
-				addonCount int
-			}
-			details := make([]projectDetail, len(projects))
-			var wg sync.WaitGroup
-			for i, p := range projects {
-				wg.Add(1)
-				go func(idx int, proj string) {
-					defer wg.Done()
-					pd, err := c.GetProject(cmd.Context(), proj)
-					if err != nil {
-						return
-					}
-					if apps, ok := pd["applications"].([]any); ok {
-						details[idx].appCount = len(apps)
-					}
-					if addons, ok := pd["addons"].([]any); ok {
-						details[idx].addonCount = len(addons)
-					}
-				}(i, p)
-			}
-			wg.Wait()
-
 			rows := make([][]string, len(projects))
 			for i, p := range projects {
-				name := p
-				if p == current {
-					name = "* " + p
+				name := p.Name
+				if p.Name == current {
+					name = "* " + p.Name
 				}
-				apps := fmt.Sprintf("%d", details[i].appCount)
-				addons := fmt.Sprintf("%d", details[i].addonCount)
-				rows[i] = []string{name, apps, addons}
+				rows[i] = []string{name, fmt.Sprintf("%d", p.AppCount), fmt.Sprintf("%d", p.AddonCount)}
 			}
 			output.Table([]string{"NAME", "APPS", "ADDONS"}, rows)
 			if current != "" {
 				found := false
 				for _, p := range projects {
-					if p == current {
+					if p.Name == current {
 						found = true
 						break
 					}
