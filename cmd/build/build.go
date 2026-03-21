@@ -118,6 +118,11 @@ func newBuildListCmd() *cobra.Command {
 					duration = time.Since(startTime).Round(time.Second).String() + " (running)"
 				}
 				rows = append(rows, []string{id, status, startedAt, duration})
+				if status == "failed" {
+					if msg := fmt.Sprintf("%v", b["message"]); msg != "" && msg != "<nil>" {
+						rows = append(rows, []string{"  └ " + msg, "", "", ""})
+					}
+				}
 			}
 			output.Table([]string{"BUILD ID", "STATUS", "STARTED", "DURATION"}, rows)
 			output.Info(fmt.Sprintf("\n  xquare logs %s --build --follow   # stream latest build logs", appName))

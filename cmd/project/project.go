@@ -128,7 +128,12 @@ func newGetCmd() *cobra.Command {
 				rows = append(rows, []string{"Addons", fmt.Sprintf("%d", len(addons))})
 				for _, a := range addons {
 					if addon, ok := a.(map[string]any); ok {
-						rows = append(rows, []string{"  " + fmt.Sprintf("%v", addon["name"]), fmt.Sprintf("%v", addon["type"])})
+						readyVal := fmt.Sprintf("%v", addon["ready"])
+						readyStr := "provisioning"
+						if readyVal == "true" {
+							readyStr = "ready"
+						}
+						rows = append(rows, []string{"  " + fmt.Sprintf("%v", addon["name"]), fmt.Sprintf("%v  (%s)", addon["type"], readyStr)})
 					}
 				}
 			}
