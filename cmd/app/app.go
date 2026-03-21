@@ -279,7 +279,13 @@ func newStatusCmd() *cobra.Command {
 			statusDisplay := formatAppStatus(appStatus)
 			switch deployPhase {
 			case "building":
-				statusDisplay = formatAppStatus(appStatus) + "  (building...)"
+				// Show build ID when available so users can immediately check logs
+				if lb, ok := status["lastBuild"].(map[string]any); ok && lb != nil {
+					buildID := fmt.Sprintf("%v", lb["id"])
+					statusDisplay = formatAppStatus(appStatus) + fmt.Sprintf("  (building: %s)", buildID)
+				} else {
+					statusDisplay = formatAppStatus(appStatus) + "  (building...)"
+				}
 			case "syncing":
 				statusDisplay = formatAppStatus(appStatus) + "  (syncing...)"
 			}

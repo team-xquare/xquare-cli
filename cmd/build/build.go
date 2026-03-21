@@ -21,6 +21,7 @@ func NewBuildCmd() *cobra.Command {
 
 func newBuildListCmd() *cobra.Command {
 	var limit int
+	var statusFilter string
 	cmd := &cobra.Command{
 		Use:     "list <app>",
 		Short:   "List recent CI/CD builds for an app",
@@ -41,6 +42,17 @@ func newBuildListCmd() *cobra.Command {
 			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, fetchLimit)
 			if err != nil {
 				return err
+			}
+			// Apply client-side status filter (server also supports ?status= but
+			// we filter here so the --limit applies after filtering, not before).
+			if statusFilter != "" {
+				filtered := builds[:0]
+				for _, b := range builds {
+					if fmt.Sprintf("%v", b["status"]) == statusFilter {
+						filtered = append(filtered, b)
+					}
+				}
+				builds = filtered
 			}
 			if api.IsJSON(cmd) {
 				// Enrich each build with a computed "duration" field so callers
@@ -65,8 +77,12 @@ func newBuildListCmd() *cobra.Command {
 				return output.JSON(enriched)
 			}
 			if len(builds) == 0 {
-				output.Info(fmt.Sprintf("no builds found for %s/%s", project, appName))
-				output.Info(fmt.Sprintf("  xquare trigger %s   # trigger first build", appName))
+				if statusFilter != "" {
+					output.Info(fmt.Sprintf("no %s builds found for %s/%s", statusFilter, project, appName))
+				} else {
+					output.Info(fmt.Sprintf("no builds found for %s/%s", project, appName))
+					output.Info(fmt.Sprintf("  xquare trigger %s   # trigger first build", appName))
+				}
 				return nil
 			}
 			rows := make([][]string, 0, len(builds))
@@ -102,5 +118,6 @@ func newBuildListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVarP(&limit, "limit", "l", 10, "maximum number of builds to show (0 = all, max 50)")
+	cmd.Flags().StringVar(&statusFilter, "status", "", "filter by status: running, success, failed, pending")
 	return cmd
 }
