@@ -403,7 +403,8 @@ func newCreateCmd() *cobra.Command {
 					if detectedRepo != "" {
 						repo = detectedRepo
 						autoDetected = true
-					} else {
+					} else if !dryRun {
+						// In dry-run, allow missing repo/owner — show the body template anyway.
 						return fmt.Errorf("--repo is required (e.g. --repo my-repo or --repo owner/my-repo)\n\n  xquare app create %s --repo <github-repo-name>", appName)
 					}
 				}
@@ -412,7 +413,7 @@ func newCreateCmd() *cobra.Command {
 					autoDetected = true
 				}
 			}
-			if owner == "" {
+			if owner == "" && !dryRun {
 				return fmt.Errorf("--owner is required (e.g. --owner my-github-org)\n\n  xquare app create %s --owner <github-org>", appName)
 			}
 			if autoDetected {
