@@ -335,14 +335,28 @@ func newAddonGetCmd() *cobra.Command {
 				return nil
 			}
 
+			// Derive connection credentials from addon type (no password — auth disabled)
+			dbUser := map[string]string{
+				"postgresql": "postgres",
+				"mysql":      "root",
+				"mongodb":    "(no auth)",
+				"redis":      "(no auth)",
+			}[addonType]
+			dbName := strings.ReplaceAll(addonName, "-", "_")
+
 			if api.IsJSON(cmd) {
-				return output.JSON(map[string]any{
-					"status":      readyStr,
-					"type":        addonType,
-					"host":        addonName,
-					"port":        conn["port"],
-					"dashboard":   dashURL,
-				})
+				out := map[string]any{
+					"status":    readyStr,
+					"type":      addonType,
+					"host":      addonName,
+					"port":      conn["port"],
+					"dashboard": dashURL,
+				}
+				if dbUser != "" {
+					out["username"] = dbUser
+					out["db_name"] = dbName
+				}
+				return output.JSON(out)
 			}
 			rows := [][]string{
 				{"Status", readyStr},
@@ -350,6 +364,13 @@ func newAddonGetCmd() *cobra.Command {
 				{"In-Cluster Host", addonName},
 				{"Port", fmt.Sprintf("%v", conn["port"])},
 				{"Dashboard", dashURL},
+			}
+			if dbUser != "" {
+				rows = append(rows,
+					[]string{"Username", dbUser},
+					[]string{"Database Name", dbName},
+					[]string{"Password", "(none — no password)"},
+				)
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
 			return nil
