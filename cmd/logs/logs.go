@@ -203,7 +203,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 			}
 		}
 
-		resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, buildID, follow, 500)
+		resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, buildID, follow, tail)
 		if err != nil {
 			if attempt == maxRetries {
 				return fmt.Errorf("stream build logs: %w", err)
