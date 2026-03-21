@@ -175,7 +175,20 @@ BEFORE calling this tool you MUST:
 			})
 
 			s.AddTool(mcp.NewTool("get_app_status",
-				mcp.WithDescription("Get deployment status: running/pending/failed/stopped/not_deployed, instance count, image version. If status is not_deployed, run deploy tool first."),
+				mcp.WithDescription(`Get deployment status and live pod health.
+
+Response fields:
+- status: running | pending | failed | stopped | not_deployed
+- deployPhase: running | pending | failed | stopped | building | syncing | not_deployed
+- scale: {desired, running} — replica counts
+- version: deployed image hash (git commit SHA)
+- instances: array of pods [{status, ready, restarts, since, reason}]
+  - reason: CrashLoopBackOff | OOMKilled | Error | ImagePullBackOff | ... (empty when healthy)
+- message: human-readable deployment condition (e.g. "Back-off restarting failed container")
+- ciReady: whether CI pipeline infrastructure is deployed
+- lastBuild: most recent build info {id, status, startedAt, message}
+
+If status is not_deployed, call trigger first. If instances[].reason is CrashLoopBackOff or OOMKilled, check logs for crash details.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
