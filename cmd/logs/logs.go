@@ -55,6 +55,43 @@ func NewLogsCmd() *cobra.Command {
 }
 
 func streamRuntimeLogs(cmd *cobra.Command, c *api.Client, project, appName string, tail int64, follow bool, since string) error {
+	// When not following, a single request is sufficient.
+	if !follow {
+		return streamRuntimeOnce(cmd, c, project, appName, tail, false, since)
+	}
+
+	// When following, reconnect on clean EOF so users see continuous output
+	// even across pod restarts or transient server-side connection closes.
+	maxRetries := 60 // ~2 min of retries at 2s intervals
+	printed := false
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		select {
+		case <-cmd.Context().Done():
+			return nil
+		default:
+		}
+
+		if attempt > 0 {
+			if printed {
+				output.Info("  connection lost, reconnecting...")
+			} else {
+				output.Info("  waiting for logs...")
+			}
+			time.Sleep(2 * time.Second)
+		}
+
+		err := streamRuntimeOnce(cmd, c, project, appName, tail, true, since)
+		if err != nil {
+			// Hard errors (app not found, not deployed, auth) — don't retry
+			return err
+		}
+		// Clean EOF — keep retrying if --follow was requested
+		printed = true
+	}
+	return nil
+}
+
+func streamRuntimeOnce(cmd *cobra.Command, c *api.Client, project, appName string, tail int64, follow bool, since string) error {
 	resp, err := c.StreamLogs(cmd.Context(), project, appName, tail, follow, since)
 	if err != nil {
 		return fmt.Errorf("stream logs: %w", err)

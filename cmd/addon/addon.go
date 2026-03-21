@@ -195,7 +195,7 @@ func newAddonUpdateCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			addonName := args[0]
 			if buckets == "" {
-				return fmt.Errorf("nothing to update\n\nAvailable flags:\n  --buckets   seaweedfs: comma-separated bucket names")
+				return fmt.Errorf("nothing to update\n\nAvailable flags:\n  --buckets   seaweedfs: comma-separated bucket names (e.g. uploads,thumbnails)\n\nNote: storage size cannot be changed after creation (Longhorn PVC is immutable).\nTo resize, delete and recreate the addon:\n  xquare addon delete %s --yes\n  xquare addon create %s <type> --storage <new-size>", addonName, addonName)
 			}
 			project, err := api.RequireProject(cmd)
 			if err != nil {
