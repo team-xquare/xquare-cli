@@ -983,6 +983,7 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 				mcp.WithString("build_id", mcp.Description("Build workflow ID (e.g. my-app-ci-abc12). Omit for latest build.")),
+				mcp.WithNumber("tail", mcp.Description("Number of lines from end (default: 500, max: 2000)")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				project, err := req.RequireString("project")
 				if err != nil {
@@ -1003,7 +1004,11 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 					}
 					buildID = fmt.Sprintf("%v", builds[0]["id"])
 				}
-				resp, err := client.StreamBuildLogs(ctx, project, appName, buildID, false)
+				tail := int64(req.GetFloat("tail", 500))
+				if tail <= 0 || tail > 2000 {
+					tail = 500
+				}
+				resp, err := client.StreamBuildLogs(ctx, project, appName, buildID, false, tail)
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}

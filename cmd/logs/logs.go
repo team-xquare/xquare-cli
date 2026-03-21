@@ -40,7 +40,7 @@ func NewLogsCmd() *cobra.Command {
 			appName := args[0]
 
 			if build {
-				return streamBuildLogs(cmd, c, project, appName, buildID, follow)
+				return streamBuildLogs(cmd, c, project, appName, buildID, follow, tail)
 			}
 			return streamRuntimeLogs(cmd, c, project, appName, tail, follow, since)
 		},
@@ -139,7 +139,7 @@ func streamRuntimeOnce(cmd *cobra.Command, c *api.Client, project, appName strin
 	return scanner.Err()
 }
 
-func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildID string, follow bool) error {
+func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildID string, follow bool, tail int64) error {
 	if buildID == "latest" {
 		builds, err := c.ListBuilds(cmd.Context(), project, appName)
 		if err != nil {
@@ -203,7 +203,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 			}
 		}
 
-		resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, buildID, follow)
+		resp, err := c.StreamBuildLogs(cmd.Context(), project, appName, buildID, follow, 500)
 		if err != nil {
 			if attempt == maxRetries {
 				return fmt.Errorf("stream build logs: %w", err)

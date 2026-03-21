@@ -433,12 +433,9 @@ func (c *Client) RemoveAllowlist(ctx context.Context, username string) error {
 	return c.delete(ctx, "/admin/allowlist/"+url.PathEscape(username))
 }
 
-func (c *Client) StreamBuildLogs(ctx context.Context, project, app, workflow string, follow bool) (*http.Response, error) {
-	rawURL := fmt.Sprintf("%s/projects/%s/apps/%s/builds/%s/logs",
-		c.base, url.PathEscape(project), url.PathEscape(app), url.PathEscape(workflow))
-	if !follow {
-		rawURL += "?follow=false"
-	}
+func (c *Client) StreamBuildLogs(ctx context.Context, project, app, workflow string, follow bool, tail int64) (*http.Response, error) {
+	rawURL := fmt.Sprintf("%s/projects/%s/apps/%s/builds/%s/logs?follow=%v&tail=%d",
+		c.base, url.PathEscape(project), url.PathEscape(app), url.PathEscape(workflow), follow, tail)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, err
