@@ -302,6 +302,8 @@ func newStatusCmd() *cobra.Command {
 
 			if appStatus == "not_deployed" && !ciReady {
 				rows = append(rows, []string{"Hint", "CI/CD pipeline initializing, please wait (~2-3 min)"})
+			} else if appStatus == "not_deployed" && ciReady {
+				rows = append(rows, []string{"Hint", fmt.Sprintf("CI/CD ready — push to GitHub or run: xquare trigger %s", args[0])})
 			}
 
 			if lb, ok := status["lastBuild"].(map[string]any); ok && lb != nil {
