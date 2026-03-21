@@ -34,25 +34,32 @@ func newBuildListCmd() *cobra.Command {
 				return err
 			}
 			appName := args[0]
-			// Request the limit from the server to avoid fetching more than needed.
+			// When a status filter is active, always fetch the maximum so --limit
+			// applies to the filtered result, not the pre-filtered fetch.
+			// Without this, "--status=success --limit=3" might fetch only 3 builds,
+			// filter them, and return 0-3 instead of up to 3 success builds.
 			fetchLimit := limit
-			if fetchLimit <= 0 {
+			if statusFilter != "" {
+				fetchLimit = 50 // fetch all, apply --limit after filtering
+			} else if fetchLimit <= 0 {
 				fetchLimit = 50 // 0 = all, let server return max
 			}
 			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, fetchLimit)
 			if err != nil {
 				return err
 			}
-			// Apply client-side status filter (server also supports ?status= but
-			// we filter here so the --limit applies after filtering, not before).
 			if statusFilter != "" {
-				filtered := builds[:0]
+				filtered := make([]map[string]any, 0)
 				for _, b := range builds {
 					if fmt.Sprintf("%v", b["status"]) == statusFilter {
 						filtered = append(filtered, b)
 					}
 				}
 				builds = filtered
+			}
+			// Apply --limit after filtering so it counts matching results, not total fetched.
+			if limit > 0 && len(builds) > limit {
+				builds = builds[:limit]
 			}
 			if api.IsJSON(cmd) {
 				// Enrich each build with a computed "duration" field so callers
