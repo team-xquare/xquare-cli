@@ -728,7 +728,7 @@ For local tunneling use 'xquare addon tunnel' CLI command.`),
 						"ready":   ready,
 						"port":    port,
 						"buckets": data["buckets"],
-						"note":    "S3-compatible storage. Configure AWS SDK: endpoint=http://" + host + ":8333, region=us-east-1 (any value). Use bucket accessKey/secretKey from the buckets field. No buckets = S3 API disabled.",
+						"note":    fmt.Sprintf("S3-compatible storage. Configure AWS SDK: endpoint=http://%s:%v, region=us-east-1 (any value). Use bucket accessKey/secretKey from the buckets field. No buckets = S3 API disabled.", host, port),
 					}, nil)
 				case "kafka":
 					return jsonResult(map[string]any{

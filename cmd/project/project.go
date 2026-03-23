@@ -3,6 +3,7 @@ package project
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -336,6 +337,9 @@ func newMembersRemoveCmd() *cobra.Command {
 				return err
 			}
 			if err := c.RemoveMember(cmd.Context(), project, args[0]); err != nil {
+				if strings.Contains(err.Error(), "not a member") {
+					return fmt.Errorf("%s\n\n  xquare project members --project %s   # list current members", err.Error(), project)
+				}
 				return err
 			}
 			output.Success(fmt.Sprintf("removed %s from project %s", args[0], project))
