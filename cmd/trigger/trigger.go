@@ -66,8 +66,8 @@ Use trigger only when:
 				output.Info("building and deploying... (Ctrl+C to stop)")
 				return watchFull(cmd, c, project, appName, buildID)
 			}
-			output.Info(fmt.Sprintf("  xquare logs %s --build          # watch build logs", appName))
-			output.Info(fmt.Sprintf("  xquare trigger %s --watch        # wait until deployed", appName))
+			output.Info(fmt.Sprintf("  xquare logs %s --build --build-id %s   # watch build logs", appName, buildID))
+			output.Info(fmt.Sprintf("  xquare app status %s                   # check deployment progress", appName))
 			return nil
 		},
 	}
@@ -133,6 +133,7 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 				}
 
 			case "syncing":
+				printOnce("  [2/3] syncing (ArgoCD applying new image)...")
 				status, err := c.GetAppStatus(cmd.Context(), project, app)
 				if err != nil {
 					continue

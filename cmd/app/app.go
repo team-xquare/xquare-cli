@@ -231,7 +231,8 @@ func newGetCmd() *cobra.Command {
 }
 
 func newStatusCmd() *cobra.Command {
-	return &cobra.Command{
+	var watch bool
+	cmd := &cobra.Command{
 		Use:   "status <app>",
 		Short: "Show deployment status",
 		Args:  cobra.ExactArgs(1),
@@ -241,6 +242,12 @@ func newStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			// --watch: poll until the app reaches a terminal state (running/failed/stopped)
+			if watch && !api.IsJSON(cmd) {
+				return watchStatus(cmd, c, project, args[0])
+			}
+
 			// Fetch status and app config in parallel to show URL alongside status.
 			type result struct {
 				status map[string]any
@@ -365,6 +372,76 @@ func newStatusCmd() *cobra.Command {
 			output.Table([]string{"FIELD", "VALUE"}, rows)
 			return nil
 		},
+	}
+	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "poll until app reaches running or failed state")
+	return cmd
+}
+
+// watchStatus polls app status every 5s until the app reaches a terminal state
+// (running, failed, stopped) or the 15-minute timeout is hit.
+func watchStatus(cmd *cobra.Command, c *api.Client, project, app string) error {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	timeout := time.After(15 * time.Minute)
+	lastPhase := ""
+
+	output.Info(fmt.Sprintf("watching %s/%s  (Ctrl+C to stop)", project, app))
+
+	for {
+		select {
+		case <-cmd.Context().Done():
+			return nil
+		case <-timeout:
+			return fmt.Errorf("timeout (15min) — app did not reach running state\n\n  xquare logs %s --build   # check build logs\n  xquare logs %s           # check runtime logs", app, app)
+		case <-ticker.C:
+			status, err := c.GetAppStatus(cmd.Context(), project, app)
+			if err != nil {
+				continue
+			}
+			appStatus := fmt.Sprintf("%v", status["status"])
+			deployPhase := fmt.Sprintf("%v", status["deployPhase"])
+
+			if deployPhase != lastPhase {
+				lastPhase = deployPhase
+				switch deployPhase {
+				case "building":
+					if lb, ok := status["lastBuild"].(map[string]any); ok && lb != nil {
+						output.Info(fmt.Sprintf("  building  [%v]", lb["id"]))
+					} else {
+						output.Info("  building...")
+					}
+				case "syncing":
+					output.Info("  syncing (ArgoCD applying changes)...")
+				case "pending":
+					output.Info("  deploying (pods starting)...")
+				case "running":
+					running, desired := "?", "?"
+					if sc, ok := status["scale"].(map[string]any); ok {
+						running = fmt.Sprintf("%v", sc["running"])
+						desired = fmt.Sprintf("%v", sc["desired"])
+					}
+					output.Success(fmt.Sprintf("running  (%s/%s pods ready)", running, desired))
+					return nil
+				case "failed":
+					msg := fmt.Sprintf("%v", status["message"])
+					if msg == "" || msg == "<nil>" {
+						msg = "pod did not start"
+					}
+					return fmt.Errorf("deploy failed: %s\n\n  xquare logs %s   # check runtime logs", msg, app)
+				case "stopped":
+					output.Success(fmt.Sprintf("app is stopped (scaled to 0)\n\n  xquare app scale %s --replicas 1   # start", app))
+					return nil
+				case "not_deployed":
+					ciReady := fmt.Sprintf("%v", status["ciReady"]) == "true"
+					if !ciReady {
+						output.Info("  CI/CD pipeline initializing...")
+					} else {
+						output.Info("  waiting for deployment (push to GitHub or run xquare trigger)...")
+					}
+				}
+				_ = appStatus
+			}
+		}
 	}
 }
 
