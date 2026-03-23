@@ -398,14 +398,14 @@ func (c *Client) ListBuilds(ctx context.Context, project, app string) ([]map[str
 	var out struct {
 		Builds []map[string]any `json:"builds"`
 	}
-	return out.Builds, c.get(ctx, "/projects/"+project+"/apps/"+app+"/builds", &out)
+	return out.Builds, c.get(ctx, "/projects/"+url.PathEscape(project)+"/apps/"+url.PathEscape(app)+"/builds", &out)
 }
 
 func (c *Client) ListBuildsLimit(ctx context.Context, project, app string, limit int) ([]map[string]any, error) {
 	var out struct {
 		Builds []map[string]any `json:"builds"`
 	}
-	path := fmt.Sprintf("/projects/%s/apps/%s/builds?limit=%d", project, app, limit)
+	path := fmt.Sprintf("/projects/%s/apps/%s/builds?limit=%d", url.PathEscape(project), url.PathEscape(app), limit)
 	return out.Builds, c.get(ctx, path, &out)
 }
 
