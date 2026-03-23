@@ -858,7 +858,9 @@ AFTER calling trigger:
 					return mcp.NewToolResultError(err.Error()), nil
 				}
 				tail := int64(req.GetFloat("tail", 100))
-				if tail > 500 {
+				if tail <= 0 {
+					tail = 100
+				} else if tail > 500 {
 					tail = 500
 				}
 				since := req.GetString("since", "")
@@ -1017,8 +1019,10 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 					buildID = fmt.Sprintf("%v", builds[0]["id"])
 				}
 				tail := int64(req.GetFloat("tail", 500))
-				if tail <= 0 || tail > 2000 {
+				if tail <= 0 {
 					tail = 500
+				} else if tail > 2000 {
+					tail = 2000
 				}
 				resp, err := client.StreamBuildLogs(ctx, project, appName, buildID, false, tail)
 				if err != nil {
