@@ -20,6 +20,24 @@ var ansiEscapeRe = regexp.MustCompile(`\x1b(?:[@-Z\\-_]|\[[0-9;]*[ -/]*[@-~]|\][
 
 func stripANSI(s string) string { return ansiEscapeRe.ReplaceAllString(s, "") }
 
+func printBuildResult(b map[string]any) {
+	status := fmt.Sprintf("%v", b["status"])
+	buildID := fmt.Sprintf("%v", b["id"])
+	msg := fmt.Sprintf("%v", b["message"])
+	switch status {
+	case "success":
+		output.Success(fmt.Sprintf("build %s: success", buildID))
+	case "failed":
+		if msg != "" && msg != "<nil>" {
+			output.Info(fmt.Sprintf("build %s: failed — %s", buildID, msg))
+		} else {
+			output.Info(fmt.Sprintf("build %s: failed", buildID))
+		}
+	default:
+		output.Info(fmt.Sprintf("build %s: %s", buildID, status))
+	}
+}
+
 func NewLogsCmd() *cobra.Command {
 	var tail int64
 	var follow bool
@@ -193,6 +211,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 								finalFetch = true
 								break
 							}
+							printBuildResult(b)
 							return nil
 						}
 						break
@@ -282,6 +301,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 					if fmt.Sprintf("%v", b["id"]) == buildID {
 						s := fmt.Sprintf("%v", b["status"])
 						if s != "running" && s != "pending" {
+							printBuildResult(b)
 							return nil // build finished, stop following
 						}
 						break

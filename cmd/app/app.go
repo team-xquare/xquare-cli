@@ -382,8 +382,11 @@ func newStatusCmd() *cobra.Command {
 func watchStatus(cmd *cobra.Command, c *api.Client, project, app string) error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	progressTicker := time.NewTicker(30 * time.Second)
+	defer progressTicker.Stop()
 	timeout := time.After(15 * time.Minute)
 	lastPhase := ""
+	startedAt := time.Now()
 
 	output.Info(fmt.Sprintf("watching %s/%s  (Ctrl+C to stop)", project, app))
 
@@ -393,6 +396,10 @@ func watchStatus(cmd *cobra.Command, c *api.Client, project, app string) error {
 			return nil
 		case <-timeout:
 			return fmt.Errorf("timeout (15min) — app did not reach running state\n\n  xquare logs %s --build   # check build logs\n  xquare logs %s           # check runtime logs", app, app)
+		case <-progressTicker.C:
+			if lastPhase != "" && lastPhase != "running" && lastPhase != "failed" && lastPhase != "stopped" {
+				output.Info(fmt.Sprintf("  still %s...  (%s elapsed)", lastPhase, time.Since(startedAt).Round(time.Second)))
+			}
 		case <-ticker.C:
 			status, err := c.GetAppStatus(cmd.Context(), project, app)
 			if err != nil {
