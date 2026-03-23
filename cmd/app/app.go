@@ -160,13 +160,13 @@ func newListCmd() *cobra.Command {
 				if r.err == nil && r.status != nil {
 					rawStatus := fmt.Sprintf("%v", r.status["status"])
 					deployPhase := fmt.Sprintf("%v", r.status["deployPhase"])
-					statusStr = formatAppStatus(rawStatus)
-					// Annotate with deploy phase for in-progress states
+					// Use deployPhase directly when it overrides the K8s status,
+					// so the table shows "building"/"syncing" instead of "not deployed (building)".
 					switch deployPhase {
-					case "building":
-						statusStr = statusStr + " (building)"
-					case "syncing":
-						statusStr = statusStr + " (syncing)"
+					case "building", "syncing":
+						statusStr = deployPhase
+					default:
+						statusStr = formatAppStatus(rawStatus)
 					}
 					if rawStatus != "not_deployed" {
 						if sc, ok := r.status["scale"].(map[string]any); ok {
