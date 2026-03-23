@@ -547,6 +547,9 @@ func newUpdateCmd() *cobra.Command {
 			c := api.FromCmd(cmd)
 			existing, err := c.GetApp(cmd.Context(), project, appName)
 			if err != nil {
+				if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "not found") {
+					return fmt.Errorf("%w\n\n  xquare app list --project %s   # see available apps", err, project)
+				}
 				return err
 			}
 			body := existing
