@@ -609,9 +609,9 @@ seaweedfs (S3-compatible object storage):
 					"storage": storage,
 				}
 				if addonType == "seaweedfs" && req.GetString("buckets", "") == "" {
-				return mcp.NewToolResultError("seaweedfs requires buckets — specify comma-separated bucket names (e.g. uploads,thumbnails). Without buckets, the S3 API is disabled and the addon is unusable."), nil
-			}
-			if bucketsStr := req.GetString("buckets", ""); bucketsStr != "" && addonType == "seaweedfs" {
+					return mcp.NewToolResultError("seaweedfs requires buckets — specify comma-separated bucket names (e.g. uploads,thumbnails). Without buckets, the S3 API is disabled and the addon is unusable."), nil
+				}
+				if bucketsStr := req.GetString("buckets", ""); bucketsStr != "" && addonType == "seaweedfs" {
 					var buckets []map[string]string
 					for _, b := range strings.Split(bucketsStr, ",") {
 						if b = strings.TrimSpace(b); b != "" {

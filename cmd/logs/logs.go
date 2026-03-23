@@ -181,7 +181,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 		if attempt > 0 {
 			// Check if build is still running before reconnecting
 			finalFetch := false
-			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, 10)
+			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, 50)
 			if err == nil {
 				for _, b := range builds {
 					if fmt.Sprintf("%v", b["id"]) == buildID {
@@ -276,7 +276,7 @@ func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildI
 		// Scanner ended (cleanly or with error) while following.
 		// Check if the build has completed — if so, we're done; otherwise reconnect.
 		if scanner.Err() == nil {
-			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, 10)
+			builds, err := c.ListBuildsLimit(cmd.Context(), project, appName, 50)
 			if err == nil {
 				for _, b := range builds {
 					if fmt.Sprintf("%v", b["id"]) == buildID {
