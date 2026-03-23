@@ -344,6 +344,9 @@ func newAddonGetCmd() *cobra.Command {
 			}[addonType]
 			dbName := strings.ReplaceAll(addonName, "-", "_")
 
+			portStr := fmt.Sprintf("%v", conn["port"])
+			connStr := connectionString(addonType, addonName, portStr, "", addonName)
+
 			if api.IsJSON(cmd) {
 				out := map[string]any{
 					"status":    readyStr,
@@ -355,6 +358,8 @@ func newAddonGetCmd() *cobra.Command {
 				if dbUser != "" {
 					out["username"] = dbUser
 					out["db_name"] = dbName
+				} else {
+					out["connection"] = connStr
 				}
 				return output.JSON(out)
 			}
@@ -362,7 +367,7 @@ func newAddonGetCmd() *cobra.Command {
 				{"Status", readyStr},
 				{"Type", addonType},
 				{"In-Cluster Host", addonName},
-				{"Port", fmt.Sprintf("%v", conn["port"])},
+				{"Port", portStr},
 				{"Dashboard", dashURL},
 			}
 			if dbUser != "" {
@@ -371,6 +376,8 @@ func newAddonGetCmd() *cobra.Command {
 					[]string{"Database Name", dbName},
 					[]string{"Password", "(none — no password)"},
 				)
+			} else {
+				rows = append(rows, []string{"Connection", connStr})
 			}
 			output.Table([]string{"FIELD", "VALUE"}, rows)
 			return nil
@@ -482,6 +489,10 @@ func newAddonTunnelCmd() *cobra.Command {
 			tunnelPort := int(portF)
 			password := fmt.Sprintf("%v", conn["password"])
 			addonType := fmt.Sprintf("%v", conn["type"])
+
+			if addonType == "seaweedfs" {
+				return fmt.Errorf("seaweedfs uses S3 protocol — use an S3 client (AWS SDK, s3cmd) instead of tunneling\n\n  xquare addon status %s   # get bucket credentials and endpoint", addonName)
+			}
 
 			if localPort == 0 {
 				localPort = freePort(tunnelPort)
