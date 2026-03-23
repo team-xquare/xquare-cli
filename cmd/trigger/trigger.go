@@ -169,6 +169,10 @@ func watchFull(cmd *cobra.Command, c *api.Client, project, app, buildID string) 
 				case "running":
 					output.Success(fmt.Sprintf("deployed  (%s/%s running)", running, desired))
 					return nil
+				case "stopped":
+					// App is intentionally scaled to 0; the new image was deployed successfully.
+					output.Success(fmt.Sprintf("deployed with latest image (app is scaled to 0)\n\n  xquare app scale %s --replicas 1 --project %s   # start the app", app, project))
+					return nil
 				case "failed":
 					failCount++
 					if failCount >= 6 {
