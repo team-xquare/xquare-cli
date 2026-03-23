@@ -189,7 +189,7 @@ Response fields:
 - ciReady: whether CI pipeline infrastructure is deployed
 - lastBuild: most recent build info {id, status, startedAt, message}
 
-If status is not_deployed, call trigger first. If instances[].reason is CrashLoopBackOff or OOMKilled, check logs for crash details.`),
+If deployPhase is not_deployed, call trigger first. If instances[].reason is CrashLoopBackOff or OOMKilled, check logs for crash details.`),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
 				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
 			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
