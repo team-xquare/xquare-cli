@@ -394,7 +394,7 @@ NOTE on build_options: you can provide build_options alone (without build_type) 
 					if e := json.Unmarshal([]byte(epStr), &eps); e != nil {
 						return mcp.NewToolResultError("invalid endpoints JSON: " + e.Error()), nil
 					}
-					var endpoints []map[string]any
+					endpoints := make([]map[string]any, 0, len(eps))
 					for _, ep := range eps {
 						parts := strings.SplitN(ep, ":", 2)
 						port := 0
@@ -554,7 +554,12 @@ ENV INJECTION TIMING:
 				}
 				if len(errs) > 0 {
 					msg := fmt.Sprintf("deleted %d env key(s); failed to delete %d:\n  %s", deleted, len(errs), strings.Join(errs, "\n  "))
-					return mcp.NewToolResultError(msg), nil
+					if deleted == 0 {
+						return mcp.NewToolResultError(msg), nil
+					}
+					// Partial success: some keys deleted, some failed — return text so the
+					// AI does not treat the whole operation as a failure.
+					return mcp.NewToolResultText(msg), nil
 				}
 				return mcp.NewToolResultText(fmt.Sprintf("deleted %d env key(s)", deleted)), nil
 			})
