@@ -34,6 +34,12 @@ func newBuildListCmd() *cobra.Command {
 				return err
 			}
 			appName := args[0]
+			if statusFilter != "" {
+				validStatuses := map[string]bool{"running": true, "success": true, "failed": true, "pending": true}
+				if !validStatuses[statusFilter] {
+					return fmt.Errorf("invalid --status %q: must be one of running, success, failed, pending", statusFilter)
+				}
+			}
 			// When a status filter is active, always fetch the maximum so --limit
 			// applies to the filtered result, not the pre-filtered fetch.
 			// Without this, "--status=success --limit=3" might fetch only 3 builds,
