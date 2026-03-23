@@ -847,6 +847,41 @@ AFTER calling trigger:
 				return mcp.NewToolResultText(msg), nil
 			})
 
+			s.AddTool(mcp.NewTool("scale_app",
+				mcp.WithDescription(`Scale app replicas up or down.
+
+Use replicas=0 to stop the app without deleting it.
+Use replicas=1 (or more) to start or resize.
+
+The app must have been deployed at least once before scaling is possible.`),
+				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),
+				mcp.WithString("app", mcp.Required(), mcp.Description("App name")),
+				mcp.WithNumber("replicas", mcp.Required(), mcp.Description("Number of replicas (0 to stop, 1-10 to run)")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				project, err := req.RequireString("project")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				appName, err := req.RequireString("app")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				replicas := int(req.GetFloat("replicas", 1))
+				if replicas < 0 || replicas > 10 {
+					return mcp.NewToolResultError("replicas must be 0-10"), nil
+				}
+				data, err := client.ScaleApp(ctx, project, appName, replicas)
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				suffix := ""
+				if replicas == 0 {
+					suffix = fmt.Sprintf("\n\nApp is stopped. To restart: call scale_app with replicas=1")
+				}
+				b, _ := json.Marshal(data)
+				return mcp.NewToolResultText(string(b) + suffix), nil
+			})
+
 			s.AddTool(mcp.NewTool("get_logs",
 				mcp.WithDescription("Get recent runtime logs for an app. Returns last N lines as text. For real-time streaming, use 'xquare logs <app> -f' CLI command instead."),
 				mcp.WithString("project", mcp.Required(), mcp.Description("Project name")),

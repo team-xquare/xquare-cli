@@ -128,6 +128,9 @@ func newAddonCreateCmd() *cobra.Command {
 			if addonType == "seaweedfs" && buckets == "" {
 				return fmt.Errorf("seaweedfs requires --buckets\n\nSpecify comma-separated bucket names:\n  --buckets uploads,thumbnails")
 			}
+			if addonType != "seaweedfs" && buckets != "" {
+				return fmt.Errorf("--buckets is only supported for seaweedfs addons (got type %q)\n\nTo use S3-compatible object storage: xquare addon create <name> seaweedfs --buckets %s", addonType, buckets)
+			}
 			storageBytes, err := parseStorageBytes(storage)
 			if err != nil {
 				return err

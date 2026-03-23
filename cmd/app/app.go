@@ -44,6 +44,7 @@ func NewAppCmd() *cobra.Command {
 		newCreateCmd(),
 		newUpdateCmd(),
 		newDeleteCmd(),
+		newScaleCmd(),
 		newAppTunnelCmd(),
 		newDashboardCmd(),
 	)
@@ -514,12 +515,18 @@ func waitCIReady(cmd *cobra.Command, c *api.Client, project, app string) error {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	timeout := time.After(5 * time.Minute)
+	progressTicker := time.NewTicker(60 * time.Second)
+	defer progressTicker.Stop()
+	elapsed := 0
 	for {
 		select {
 		case <-cmd.Context().Done():
 			return nil
 		case <-timeout:
 			return fmt.Errorf("timeout: CI/CD pipeline not ready after 5 minutes\n\n  xquare app status %s   # check status", app)
+		case <-progressTicker.C:
+			elapsed++
+			output.Info(fmt.Sprintf("  still waiting... (%dm elapsed)", elapsed))
 		case <-ticker.C:
 			status, err := c.GetAppStatus(cmd.Context(), project, app)
 			if err != nil {
@@ -530,6 +537,51 @@ func waitCIReady(cmd *cobra.Command, c *api.Client, project, app string) error {
 			}
 		}
 	}
+}
+
+func newScaleCmd() *cobra.Command {
+	var replicas int
+	cmd := &cobra.Command{
+		Use:   "scale <app>",
+		Short: "Scale app replicas (0 to stop, 1+ to start)",
+		Long: `Set the number of replicas for a deployed app.
+
+Use --replicas 0 to stop the app without deleting it.
+Use --replicas 1 (or more) to start or resize.
+
+The app must have been deployed at least once (push to GitHub first).`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			project, err := api.RequireProject(cmd)
+			if err != nil {
+				return err
+			}
+			appName := args[0]
+			if replicas < 0 || replicas > 10 {
+				return fmt.Errorf("replicas must be 0-10")
+			}
+			c := api.FromCmd(cmd)
+			result, err := c.ScaleApp(cmd.Context(), project, appName, replicas)
+			if err != nil {
+				if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "not been deployed") {
+					return fmt.Errorf("%w\n\n  push to GitHub first to trigger the initial build", err)
+				}
+				return err
+			}
+			if api.IsJSON(cmd) {
+				return output.JSON(result)
+			}
+			if replicas == 0 {
+				output.Success(fmt.Sprintf("scaled %s/%s to 0 replicas (stopped)", project, appName))
+				output.Info(fmt.Sprintf("  xquare app scale %s --replicas 1   # restart", appName))
+			} else {
+				output.Success(fmt.Sprintf("scaled %s/%s to %d replica(s)", project, appName, replicas))
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&replicas, "replicas", 1, "number of replicas (0 to stop, 1-10 to run)")
+	return cmd
 }
 
 func newUpdateCmd() *cobra.Command {

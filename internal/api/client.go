@@ -304,6 +304,11 @@ func (c *Client) DeleteApp(ctx context.Context, project, app string) error {
 	return c.delete(ctx, "/projects/"+project+"/apps/"+app)
 }
 
+func (c *Client) ScaleApp(ctx context.Context, project, app string, replicas int) (map[string]any, error) {
+	var out map[string]any
+	return out, c.patch(ctx, "/projects/"+project+"/apps/"+app+"/scale", map[string]any{"replicas": replicas}, &out)
+}
+
 func (c *Client) TriggerApp(ctx context.Context, project, app string) (map[string]any, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		c.base+"/projects/"+project+"/apps/"+app+"/trigger", nil)
