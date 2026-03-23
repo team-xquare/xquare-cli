@@ -47,7 +47,10 @@ Use trigger only when:
 				return err
 			}
 
-			buildID := fmt.Sprintf("%v", result["build"])
+			buildID := ""
+			if result != nil {
+				buildID = fmt.Sprintf("%v", result["build"])
+			}
 
 			if api.IsJSON(cmd) {
 				return output.JSON(map[string]string{
