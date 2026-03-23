@@ -39,6 +39,12 @@ func NewLogsCmd() *cobra.Command {
 			}
 			appName := args[0]
 
+			if since != "" {
+				if _, err := time.ParseDuration(since); err != nil {
+					return fmt.Errorf("invalid --since value %q: must be a valid duration (e.g. 1h, 30m, 5m)", since)
+				}
+			}
+
 			if build {
 				return streamBuildLogs(cmd, c, project, appName, buildID, follow, tail)
 			}
