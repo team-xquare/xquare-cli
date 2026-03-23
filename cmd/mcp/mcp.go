@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -858,6 +859,11 @@ AFTER calling trigger:
 					tail = 500
 				}
 				since := req.GetString("since", "")
+				if since != "" {
+					if _, serr := time.ParseDuration(since); serr != nil {
+						return mcp.NewToolResultError(fmt.Sprintf("invalid since value %q: must be a valid duration (e.g. 1h, 30m, 5m)", since)), nil
+					}
+				}
 				resp, err := client.StreamLogs(ctx, project, appName, tail, false, since)
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
