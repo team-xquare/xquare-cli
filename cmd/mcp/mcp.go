@@ -976,8 +976,11 @@ BEFORE calling this tool you MUST:
 					return mcp.NewToolResultError(err.Error()), nil
 				}
 				limit := int(req.GetFloat("limit", 10))
-				if limit <= 0 || limit > 50 {
+				if limit <= 0 {
 					limit = 10
+				}
+				if limit > 50 {
+					limit = 50
 				}
 				data, err := client.ListBuildsLimit(ctx, project, app, limit)
 				return jsonResult(data, err)

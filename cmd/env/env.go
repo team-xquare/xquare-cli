@@ -281,8 +281,8 @@ func newEnvPullCmd() *cobra.Command {
 			var lines []string
 			for _, k := range keys {
 				v := envs[k]
-				// Quote value if contains spaces or special chars
-				if strings.ContainsAny(v, " \t\n\"'\\") {
+				// Quote value if contains spaces or shell-special chars
+				if strings.ContainsAny(v, " \t\n\"'\\$`") {
 					v = fmt.Sprintf("%q", v)
 				}
 				lines = append(lines, fmt.Sprintf("%s=%s", k, v))
