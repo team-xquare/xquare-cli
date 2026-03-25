@@ -25,6 +25,7 @@ func NewServerCmd() *cobra.Command {
 		Short: "Server administration commands (admin only)",
 	}
 	cmd.AddCommand(newAllowlistCmd())
+	cmd.AddCommand(newUsersCmd())
 	return cmd
 }
 

@@ -104,6 +104,7 @@ func buildSchema() map[string]any {
 			appSchema(),
 			envSchema(),
 			addonSchema(),
+			serverSchema(),
 			{
 				Command:     "build",
 				Description: "Manage CI/CD builds. Use 'build list' to see recent build history.",
@@ -385,6 +386,43 @@ func envSchema() CommandSchema {
 					{Name: "dry-run", Type: "bool", Desc: "preview"},
 				},
 				Examples: []string{"xquare env push my-api", "xquare env push my-api -f prod.env"},
+			},
+		},
+	}
+}
+
+func serverSchema() CommandSchema {
+	return CommandSchema{
+		Command:     "server",
+		Description: "Server administration commands (admin only). Manage platform-level settings: allowlist and user inspection.",
+		SubCommands: []CommandSchema{
+			{
+				Command:     "server allowlist",
+				Description: "List users in the platform allowlist.",
+				Examples:    []string{"xquare server allowlist list", "xquare server allowlist list --json"},
+			},
+			{
+				Command:     "server allowlist add <github-username>",
+				Description: "Add a GitHub user to the platform allowlist, granting them access to xquare.",
+				Args:        []ArgSchema{{Name: "github-username", Required: true, Desc: "GitHub username to allow"}},
+				Examples:    []string{"xquare server allowlist add johndoe"},
+			},
+			{
+				Command:     "server allowlist remove <github-username>",
+				Description: "Remove a GitHub user from the platform allowlist, revoking their access.",
+				Args:        []ArgSchema{{Name: "github-username", Required: true, Desc: "GitHub username to remove"}},
+				Examples:    []string{"xquare server allowlist remove johndoe"},
+			},
+			{
+				Command:     "server users list",
+				Description: "List ALL platform users (union of allowlist + all project owners), with allowlist status and project memberships. Use this to see who has access to the platform.",
+				Examples:    []string{"xquare server users list", "xquare server users list --json"},
+			},
+			{
+				Command:     "server users get <github-username>",
+				Description: "Show a specific user's allowlist status and which projects they belong to.",
+				Args:        []ArgSchema{{Name: "github-username", Required: true}},
+				Examples:    []string{"xquare server users get johndoe"},
 			},
 		},
 	}

@@ -438,6 +438,24 @@ func (c *Client) RemoveAllowlist(ctx context.Context, username string) error {
 	return c.delete(ctx, "/admin/allowlist/"+url.PathEscape(username))
 }
 
+func (c *Client) ListUsers(ctx context.Context) ([]map[string]any, error) {
+	var resp struct {
+		Users []map[string]any `json:"users"`
+	}
+	if err := c.get(ctx, "/admin/users", &resp); err != nil {
+		return nil, err
+	}
+	return resp.Users, nil
+}
+
+func (c *Client) GetUser(ctx context.Context, username string) (map[string]any, error) {
+	var result map[string]any
+	if err := c.get(ctx, "/admin/users/"+url.PathEscape(username), &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (c *Client) StreamBuildLogs(ctx context.Context, project, app, workflow string, follow bool, tail int64) (*http.Response, error) {
 	rawURL := fmt.Sprintf("%s/projects/%s/apps/%s/builds/%s/logs?follow=%v&tail=%d",
 		c.base, url.PathEscape(project), url.PathEscape(app), url.PathEscape(workflow), follow, tail)

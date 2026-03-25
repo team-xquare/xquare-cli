@@ -1086,6 +1086,27 @@ Use list_builds to get build IDs, or omit build_id to get the latest build logs.
 				return mcp.NewToolResultText(strings.Join(lines, "\n")), nil
 			})
 
+			// ── Admin: Users ──────────────────────────────────────────────
+
+			s.AddTool(mcp.NewTool("list_users",
+				mcp.WithDescription("List all platform users with their allowlist status and project memberships (admin only)."),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				data, err := client.ListUsers(ctx)
+				return jsonResult(data, err)
+			})
+
+			s.AddTool(mcp.NewTool("get_user",
+				mcp.WithDescription("Get a platform user's allowlist status and project memberships by GitHub username (admin only)."),
+				mcp.WithString("username", mcp.Required(), mcp.Description("GitHub username")),
+			), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				username, err := req.RequireString("username")
+				if err != nil {
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+				data, err := client.GetUser(ctx, username)
+				return jsonResult(data, err)
+			})
+
 			// ── Meta ──────────────────────────────────────────────────────
 
 			s.AddTool(mcp.NewTool("whoami",
