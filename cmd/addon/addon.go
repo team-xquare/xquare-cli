@@ -530,7 +530,7 @@ func newAddonTunnelCmd() *cobra.Command {
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-			localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, addonName, tunnelPort)
+			localArg := fmt.Sprintf("tcp://127.0.0.1:%d:%s:%d", localPort, addonName, tunnelPort)
 			proc := exec.Command(wstunnelBin, "client",
 				"-L", localArg,
 				"--log-lvl", "OFF",
@@ -562,7 +562,7 @@ func resolveBinary() (binPath string, cleanup func(), err error) {
 }
 
 func startTunnelProc(bin, tunnelHost, password, serviceName string, servicePort, localPort int) (*os.Process, error) {
-	localArg := fmt.Sprintf("tcp://0.0.0.0:%d:%s:%d", localPort, serviceName, servicePort)
+	localArg := fmt.Sprintf("tcp://127.0.0.1:%d:%s:%d", localPort, serviceName, servicePort)
 	// Pass password via environment variable instead of CLI arg to prevent
 	// exposure in process listings (ps aux / /proc/PID/cmdline).
 	cmd := exec.Command(bin, "client",
