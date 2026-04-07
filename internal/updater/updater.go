@@ -323,9 +323,10 @@ func replaceExec(execPath string, data []byte) error {
 	}
 
 	// Windows cannot overwrite a running executable; rename it to .old first.
+	// Use a PID-scoped name to avoid collisions with leftover .old files from
+	// previous upgrade attempts (os.Rename fails if the destination exists).
 	if runtime.GOOS == "windows" {
-		oldPath := execPath + ".old"
-		_ = os.Remove(oldPath)
+		oldPath := fmt.Sprintf("%s.%d.old", execPath, os.Getpid())
 		if err := os.Rename(execPath, oldPath); err != nil {
 			cleanup()
 			return err
