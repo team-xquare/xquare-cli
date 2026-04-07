@@ -22,7 +22,11 @@ func ExtractWstunnel() (path string, cleanup func(), err error) {
 	if name != "" {
 		data, readErr := binaries.ReadFile("bin/" + name)
 		if readErr == nil {
-			tmp, tmpErr := os.CreateTemp("", "wstunnel-*")
+			pattern := "wstunnel-*"
+			if runtime.GOOS == "windows" {
+				pattern = "wstunnel-*.exe"
+			}
+			tmp, tmpErr := os.CreateTemp("", pattern)
 			if tmpErr != nil {
 				return "", nil, fmt.Errorf("create temp file: %w", tmpErr)
 			}
