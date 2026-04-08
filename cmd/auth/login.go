@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 
@@ -57,8 +58,9 @@ Prints the URL to open in your browser.`,
 	return cmd
 }
 
-// receiveOAuthCode starts a local HTTP server on :9999, prints the GitHub OAuth URL,
-// and waits for the callback to receive the code.
+// receiveOAuthCode starts a local HTTP server on an OS-assigned ephemeral port,
+// prints the GitHub OAuth URL, and waits for the callback to receive the code.
+// GitHub allows any port on 127.0.0.1 for loopback redirects (RFC 8252 §7.3).
 func receiveOAuthCode() (string, error) {
 	codeCh := make(chan string, 1)
 	errCh := make(chan error, 1)
@@ -66,24 +68,33 @@ func receiveOAuthCode() (string, error) {
 	cfg, _ := config.LoadGlobal()
 	clientID := getClientID(cfg.ServerURL)
 
+	// Bind to loopback only — prevents network-adjacent attackers from
+	// intercepting the OAuth authorization code on the callback port.
+	// Port 0 lets the OS pick an available ephemeral port (RFC 8252 §7.3).
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", fmt.Errorf("listen: %w", err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+
 	// Generate a random state token to prevent CSRF attacks.
 	stateBytes := make([]byte, 16)
 	if _, err := rand.Read(stateBytes); err != nil {
+		ln.Close()
 		return "", fmt.Errorf("generate oauth state: %w", err)
 	}
 	state := hex.EncodeToString(stateBytes)
 
+	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 	authURL := fmt.Sprintf(
 		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=read:user&state=%s",
-		clientID, "http://localhost:9999/callback", state,
+		clientID, redirectURI, state,
 	)
 
 	output.Info("Open this URL in your browser:")
 	output.Info(authURL)
 
-	// Bind to loopback only — prevents network-adjacent attackers from
-	// intercepting the OAuth authorization code on the callback port.
-	srv := &http.Server{Addr: "127.0.0.1:9999"}
+	srv := &http.Server{}
 	mux := http.NewServeMux()
 	srv.Handler = mux
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +118,7 @@ func receiveOAuthCode() (string, error) {
 
 	_ = cfg // avoid unused
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}
 	}()
