@@ -149,6 +149,9 @@ func streamRuntimeOnce(cmd *cobra.Command, c *api.Client, project, appName strin
 	scanner.Buffer(make([]byte, 512*1024), 512*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
+		if line == "" {
+			continue // server keepalive line
+		}
 		if isJSON {
 			_ = output.NDJSONLine(map[string]string{"line": line})
 		} else {
@@ -160,7 +163,12 @@ func streamRuntimeOnce(cmd *cobra.Command, c *api.Client, project, appName strin
 		default:
 		}
 	}
-	return scanner.Err()
+	// scanner.Err() is a network-level disconnect (e.g. proxy reset), not a hard
+	// error. Return nil so the --follow reconnect loop retries automatically.
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "xquare: connection lost (%v)\n", err)
+	}
+	return nil
 }
 
 func streamBuildLogs(cmd *cobra.Command, c *api.Client, project, appName, buildID string, follow bool, tail int64) error {
